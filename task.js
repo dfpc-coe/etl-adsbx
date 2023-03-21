@@ -72,11 +72,11 @@ export default class Task extends ETL {
     async control() {
         const layer = await this.layer();
 
-        if (!layer.data.environment.ADSBX_TOKEN) throw new Error('No ADSBX API Token Provided');
-        if (!layer.data.environment.ADSBX_INCLUDES) layer.data.environment.ADSBX_INCLUDES = '[]';
+        if (!layer.environment.ADSBX_TOKEN) throw new Error('No ADSBX API Token Provided');
+        if (!layer.environment.ADSBX_INCLUDES) layer.environment.ADSBX_INCLUDES = '[]';
 
-        const token = layer.data.environment.ADSBX_TOKEN;
-        const includes = layer.data.environment.ADSBX_INCLUDES;
+        const token = layer.environment.ADSBX_TOKEN;
+        const includes = layer.environment.ADSBX_INCLUDES;
         const api = 'https://adsbexchange.com/api/aircraft/v2/lat/40.14401/lon/-119.81204/dist/2650/';
 
         const url = new URL(api);
