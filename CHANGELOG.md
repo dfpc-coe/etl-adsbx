@@ -10,6 +10,10 @@
 
 ## Version History
 
+### v1.12.1
+
+- :rocket: Update to new API Style for accessing env vars 
+
 ### v1.12.0
 
 - :tada: Add `course` and `speed` properties
