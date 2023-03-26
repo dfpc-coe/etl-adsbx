@@ -100,6 +100,8 @@ export default class Task extends ETL {
             // If alt. is present convert to meters
             if (!isNaN(parseInt(ac.alt_geom))) coordinates.push(ac.alt_geom * 0.3048);
 
+            if (!id.trim().length) continue;
+
             ids.set(id, {
                 id: id,
                 type: 'Feature',

@@ -10,6 +10,10 @@
 
 ## Version History
 
+### v1.12.2
+
+- :bug: Ensure IDs are populated
+
 ### v1.12.1
 
 - :rocket: Update to new API Style for accessing env vars 
