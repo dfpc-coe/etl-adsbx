@@ -1,12 +1,17 @@
 import fs from 'fs';
-import ETL from '@tak-ps/etl';
+import {
+    FeatureCollection
+} from 'geojson';
+import ETL, {
+    Event
+} from '@tak-ps/etl';
 
 try {
     const dotfile = new URL('.env', import.meta.url);
 
     fs.accessSync(dotfile);
 
-    Object.assign(process.env, JSON.parse(fs.readFileSync(dotfile)));
+    Object.assign(process.env, JSON.parse(String(fs.readFileSync(dotfile))));
 } catch (err) {
     console.log('ok - no .env file loaded');
 }
@@ -81,7 +86,7 @@ export default class Task extends ETL {
 
         const url = new URL(api);
         url.searchParams.append('apiKey', token);
-        url.searchParams.append('cacheBuster', +new Date());
+        url.searchParams.append('cacheBuster', String(new Date().getTime()));
 
         const res = await fetch(url, {
             headers: {
@@ -161,14 +166,13 @@ export default class Task extends ETL {
         }
 
         console.log(`ok - fetched ${ids.size} planes`);
-        const fc = {
+        const fc: FeatureCollection = {
             type: 'FeatureCollection',
             features
         };
 
         await this.submit(fc);
 
-        /*
         const knownres = await fetch(new URL(`/api/layer/${this.etl.layer}/query`, this.etl.api), {
             method: 'GET',
             headers: {
@@ -180,11 +184,29 @@ export default class Task extends ETL {
 
         //TODO: Implement
         console.log(`ok - comparing against ${known.features.length} planes`);
-        */
+
+        const now = new Date().getTime();
+        const alerts = [];
+        for (const kfeat of known.features) {
+            // Ignore after 10 minutes
+            if (new Date(kfeat.properties.start).getTime() < (now - 600000)) continue;
+
+            if (!features_ids.has(kfeat.id)) {
+                alerts.push(kfeat);
+            }
+        }
+
+        console.log(`ok - posting ${alerts.length} alerts`);
+        for (const alert of alerts) {
+            this.alert({
+                title: `Missing: ${alert.id}`,
+                priority: 'yellow',
+            });
+        }
     }
 }
 
-export async function handler(event = {}) {
+export async function handler(event: Event = {}) {
     if (event.type === 'schema') {
         return Task.schema();
     } else {
