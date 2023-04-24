@@ -10,6 +10,12 @@
 
 ## Version History
 
+### v1.13.0
+
+- :rocket: Update core library to Typescript
+- :arrow_up: Update to latest ETL-Base to support new alert() fn
+- :tada: Add comparison check for DynamoDB known items
+
 ### v1.12.2
 
 - :bug: Ensure IDs are populated
