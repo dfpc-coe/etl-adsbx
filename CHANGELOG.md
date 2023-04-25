@@ -10,6 +10,10 @@
 
 ## Version History
 
+### v1.14.0
+
+- :rocket: Improved filtering of missing aircraft
+
 ### v1.13.1
 
 - :bug: Fix TS Dep bug
