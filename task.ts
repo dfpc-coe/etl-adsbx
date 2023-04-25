@@ -204,12 +204,17 @@ export default class Task extends ETL {
 
         console.log(`ok - posting ${alerts.length} alerts`);
         for (const alert of alerts) {
-            console.error(now - new Date(alert.properties.start).getTime());
+            const mins = Math.round((now - new Date(alert.properties.start).getTime()) / 1000 / 60);
+
+            let priority: string = 'green';
+            if (mins <= 8 && mins > 2) priority = 'yellow';
+            if (mins > 8) priority = 'red';
+
             await this.alert({
                 title: `Missing: ${alert.id}`,
                 icon: 'alert-hexagon',
-                description: `Aircraft has been missing for ~${Math.round((now - new Date(alert.properties.start).getTime()) / 1000 / 60)} minutes`,
-                priority: 'yellow',
+                description: `Aircraft has been missing for ~${mins} minutes - Last Position: ${JSON.stringify(alert.geometry)}`,
+                priority
             });
         }
     }
