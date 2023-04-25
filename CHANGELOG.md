@@ -10,6 +10,10 @@
 
 ## Version History
 
+### v1.13.1
+
+- :bug: Fix TS Dep bug
+
 ### v1.13.0
 
 - :rocket: Update core library to Typescript
