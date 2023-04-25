@@ -208,7 +208,7 @@ export default class Task extends ETL {
             await this.alert({
                 title: `Missing: ${alert.id}`,
                 icon: 'alert-hexagon',
-                description: `Plane has been missing for ~${Math.round((now - new Date(alert.properties.start).getTime()) / 1000 / 60)} minutes`,
+                description: `Aircraft has been missing for ~${Math.round((now - new Date(alert.properties.start).getTime()) / 1000 / 60)} minutes`,
                 priority: 'yellow',
             });
         }
