@@ -1,6 +1,7 @@
 import fs from 'fs';
 import {
-    FeatureCollection
+    FeatureCollection,
+    Feature
 } from 'geojson';
 import ETL, {
     Event
@@ -186,20 +187,26 @@ export default class Task extends ETL {
         console.log(`ok - comparing against ${known.features.length} planes`);
 
         const now = new Date().getTime();
-        const alerts = [];
-        for (const kfeat of known.features) {
+        const alerts: Feature[] = [];
+        known.features.filter((kfeat: Feature) => {
             // Ignore after 10 minutes
-            if (new Date(kfeat.properties.start).getTime() < (now - 600000)) continue;
+            if (new Date(kfeat.properties.start).getTime() < (now - 600000)) return false;
 
+            // Ignore under 1 minute
+            if (new Date(kfeat.properties.start).getTime() > (now - 60000)) return false;
+
+            return true;
+        }).forEach((kfeat: Feature) => {
             if (!features_ids.has(kfeat.id)) {
                 alerts.push(kfeat);
             }
-        }
+        });
 
         console.log(`ok - posting ${alerts.length} alerts`);
         for (const alert of alerts) {
-            this.alert({
+            await this.alert({
                 title: `Missing: ${alert.id}`,
+                description: `Plane has been missing ${now - new Date(alert.properties.start).getTime() / 1000} for minutes`,
                 priority: 'yellow',
             });
         }
