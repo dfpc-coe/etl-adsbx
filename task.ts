@@ -206,6 +206,7 @@ export default class Task extends ETL {
         for (const alert of alerts) {
             await this.alert({
                 title: `Missing: ${alert.id}`,
+                icon: 'alert-hexagon',
                 description: `Plane has been missing ${now - new Date(alert.properties.start).getTime() / 1000} for minutes`,
                 priority: 'yellow',
             });
