@@ -25,7 +25,11 @@ export default class Task extends ETL {
             properties: {
                 'ADSBX_TOKEN': {
                     type: 'string',
-                    description: 'API Token for ADSBExachange'
+                    description: 'API Token for ADSBExchange'
+                },
+                'RUNWAY_EXCLUDE': {
+                    type: 'string',
+                    description: 'Reverse Geocoding Layer for excluding aircraft that are on a known runway'
                 },
                 'ADSBX_INCLUDES': {
                     type: 'array',
@@ -166,7 +170,7 @@ export default class Task extends ETL {
             }
         }
 
-        console.log(`ok - fetched ${ids.size} planes`);
+        console.log(`ok - fetched ${ids.size} aircraft`);
         const fc: FeatureCollection = {
             type: 'FeatureCollection',
             features
@@ -184,7 +188,7 @@ export default class Task extends ETL {
         const known = await knownres.json();
 
         //TODO: Implement
-        console.log(`ok - comparing against ${known.features.length} planes`);
+        console.log(`ok - comparing against ${known.features.length} aircraft`);
 
         const now = new Date().getTime();
         const alerts: Feature[] = [];
@@ -202,7 +206,22 @@ export default class Task extends ETL {
             }
         });
 
+        console.log(`ok - detected ${alerts.length} aircraft in alert`);
+        const alerts_fc: FeatureCollection = {
+            type: 'FeatureCollection',
+            features: alerts.map((kfeat) => {
+                // Mark Aircraft as "hostile" for now to differentiate
+                kfeat.properties.type = kfeat.properties.type.replace(/^a-f-/, 'a-h-');
+                kfeat.properties.time = new Date();
+                kfeat.properties.start = new Date();
+                delete kfeat.properties.icon;
+                delete kfeat.properties.stale;
+                return kfeat;
+            })
+        };
+
         console.log(`ok - posting ${alerts.length} alerts`);
+        if (alerts_fc.features.length) await this.submit(alerts_fc);
         for (const alert of alerts) {
             const mins = Math.round((now - new Date(alert.properties.start).getTime()) / 1000 / 60);
 

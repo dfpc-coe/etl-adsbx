@@ -10,6 +10,10 @@
 
 ## Version History
 
+### v1.15.0
+
+- :tada: Submit Alerts as CoT and use updated Alert API
+
 ### v1.14.0
 
 - :rocket: Improved filtering of missing aircraft
