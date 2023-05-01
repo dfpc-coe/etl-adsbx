@@ -225,14 +225,16 @@ export default class Task extends ETL {
         for (const alert of alerts) {
             const mins = Math.round((now - new Date(alert.properties.start).getTime()) / 1000 / 60);
 
-            let priority: string = 'green';
+            let priority = 'green';
             if (mins <= 8 && mins > 2) priority = 'yellow';
             if (mins > 8) priority = 'red';
+
+            const coords: string = (alert.geometry.type === 'Point' && alert.geometry.coordinates) ? alert.geometry.coordinates.join(',') : JSON.stringify(alert.geometry);
 
             await this.alert({
                 title: `Missing: ${alert.id}`,
                 icon: 'alert-hexagon',
-                description: `Aircraft has been missing for ~${mins} minutes - Last Position: ${JSON.stringify(alert.geometry)}`,
+                description: `Aircraft has been missing for ~${mins} minutes - Last Position: ${coords}`,
                 priority
             });
         }
