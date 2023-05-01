@@ -10,6 +10,10 @@
 
 ## Version History
 
+### v1.15.1
+
+- :bug: Human Readable Coordinate Formatting
+
 ### v1.15.0
 
 - :tada: Submit Alerts as CoT and use updated Alert API
