@@ -10,6 +10,10 @@
 
 ## Version History
 
+### v1.16.0
+
+- :rocket: Add `remarks` and `stale` to Alerts
+
 ### v1.15.1
 
 - :bug: Human Readable Coordinate Formatting
