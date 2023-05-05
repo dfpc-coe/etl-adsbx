@@ -214,8 +214,9 @@ export default class Task extends ETL {
                 kfeat.properties.type = kfeat.properties.type.replace(/^a-f-/, 'a-h-');
                 kfeat.properties.time = new Date();
                 kfeat.properties.start = new Date();
+                kfeat.properties.stale = 14400000; // 4 Hours
+                kfeat.properties.remarks = `Unreported since: ${new Date()}`,
                 delete kfeat.properties.icon;
-                delete kfeat.properties.stale;
                 return kfeat;
             })
         };
