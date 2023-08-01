@@ -10,6 +10,10 @@
 
 ## Version History
 
+### v2.0.0
+
+- :rocket: Update to ETL-Base@2 to support output Schema
+
 ### v1.16.0
 
 - :rocket: Add `remarks` and `stale` to Alerts
@@ -42,7 +46,7 @@
 
 ### v1.12.1
 
-- :rocket: Update to new API Style for accessing env vars 
+- :rocket: Update to new API Style for accessing env vars
 
 ### v1.12.0
 

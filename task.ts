@@ -1,10 +1,12 @@
 import fs from 'fs';
+import { JSONSchema6Object } from 'json-schema';
 import {
     FeatureCollection,
     Feature
 } from 'geojson';
 import ETL, {
-    Event
+    Event,
+    SchemaType
 } from '@tak-ps/etl';
 
 try {
@@ -18,74 +20,94 @@ try {
 }
 
 export default class Task extends ETL {
-    static schema() {
-        return {
-            type: 'object',
-            required: ['ADSBX_TOKEN'],
-            properties: {
-                'ADSBX_TOKEN': {
-                    type: 'string',
-                    description: 'API Token for ADSBExchange'
-                },
-                'RUNWAY_EXCLUDE': {
-                    type: 'string',
-                    description: 'Reverse Geocoding Layer for excluding aircraft that are on a known runway'
-                },
-                'ADSBX_INCLUDES': {
-                    type: 'array',
-                    display: 'table',
-                    description: 'Limit resultant features to a given list of ids',
-                    items: {
-                        type: 'object',
-                        properties: {
-                            domain: {
-                                type: 'string',
-                                description: 'Public Safety domain of the Aircraft',
-                                enum: ['EMS', 'FIRE', 'LAW']
-                            },
-                            agency: {
-                                type: 'string',
-                                description: 'Agency in control of the Aircraft'
-                            },
-                            callsign: {
-                                type: 'string',
-                                description: 'Callsign of the Aircraft'
-                            },
-                            registration: {
-                                type: 'string',
-                                description: 'Registration Number of the Aircraft'
-                            },
-                            type: {
-                                type: 'string',
-                                description: 'Type of Aircraft',
-                                enum: [
-                                    'HELICOPTER',
-                                    'FIXED WING'
-                                ]
-                            },
-                            icon: {
-                                type: 'string',
-                                description: 'Optional TAK Custom Icon'
+    static async schema(type: SchemaType = SchemaType.Input): Promise<JSONSchema6Object> {
+        if (type === SchemaType.Input) {
+            return {
+                type: 'object',
+                required: ['ADSBX_TOKEN'],
+                properties: {
+                    'ADSBX_TOKEN': {
+                        type: 'string',
+                        description: 'API Token for ADSBExchange'
+                    },
+                    'RUNWAY_EXCLUDE': {
+                        type: 'string',
+                        description: 'Reverse Geocoding Layer for excluding aircraft that are on a known runway'
+                    },
+                    'ADSBX_INCLUDES': {
+                        type: 'array',
+                        display: 'table',
+                        description: 'Limit resultant features to a given list of ids',
+                        items: {
+                            type: 'object',
+                            properties: {
+                                domain: {
+                                    type: 'string',
+                                    description: 'Public Safety domain of the Aircraft',
+                                    enum: ['EMS', 'FIRE', 'LAW']
+                                },
+                                agency: {
+                                    type: 'string',
+                                    description: 'Agency in control of the Aircraft'
+                                },
+                                callsign: {
+                                    type: 'string',
+                                    description: 'Callsign of the Aircraft'
+                                },
+                                registration: {
+                                    type: 'string',
+                                    description: 'Registration Number of the Aircraft'
+                                },
+                                type: {
+                                    type: 'string',
+                                    description: 'Type of Aircraft',
+                                    enum: [
+                                        'HELICOPTER',
+                                        'FIXED WING'
+                                    ]
+                                },
+                                icon: {
+                                    type: 'string',
+                                    description: 'Optional TAK Custom Icon'
+                                }
                             }
                         }
+                    },
+                    'DEBUG': {
+                        type: 'boolean',
+                        default: false,
+                        description: 'Print ADSBX results in logs'
                     }
-                },
-                'DEBUG': {
-                    type: 'boolean',
-                    default: false,
-                    description: 'Print ADSBX results in logs'
                 }
             }
-        };
+        } else {
+            return {
+                type: 'object',
+                additionalProperties: false,
+                required: ['registration'],
+                properties: {
+                    registration: {
+                        type: 'string'
+                    },
+                    squak: {
+                        type: 'string'
+                    },
+                    emergency: {
+                        type: 'string'
+                    }
+                }
+            }
+        }
     }
 
     async control() {
         const layer = await this.layer();
 
         if (!layer.environment.ADSBX_TOKEN) throw new Error('No ADSBX API Token Provided');
-        if (!layer.environment.ADSBX_INCLUDES) layer.environment.ADSBX_INCLUDES = '[]';
+        if (!layer.environment.ADSBX_INCLUDES) layer.environment.ADSBX_INCLUDES = [];
+        if (!Array.isArray(layer.environment.ADSBX_INCLUDES)) throw new Error('ADSBX_INCLUDES Must be Array');
 
-        const token = layer.environment.ADSBX_TOKEN;
+        const token = String(layer.environment.ADSBX_TOKEN);
         const includes = layer.environment.ADSBX_INCLUDES;
         const api = 'https://adsbexchange.com/api/aircraft/v2/lat/40.14401/lon/-119.81204/dist/2650/';
 
@@ -243,8 +265,10 @@ export default class Task extends ETL {
 }
 
 export async function handler(event: Event = {}) {
-    if (event.type === 'schema') {
-        return Task.schema();
+    if (event.type === 'schema:input') {
+        return Task.schema(SchemaType.Input);
+    } else if (event.type === 'schema:output') {
+        return Task.schema(SchemaType.Output);
     } else {
         const task = new Task();
         await task.control();
