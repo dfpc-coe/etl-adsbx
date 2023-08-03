@@ -1,5 +1,5 @@
 import fs from 'fs';
-import { JSONSchema6Object } from 'json-schema';
+import { JSONSchema6 } from 'json-schema';
 import {
     FeatureCollection,
     Feature
@@ -20,7 +20,7 @@ try {
 }
 
 export default class Task extends ETL {
-    static async schema(type: SchemaType = SchemaType.Input): Promise<JSONSchema6Object> {
+    static async schema(type: SchemaType = SchemaType.Input): Promise<JSONSchema6> {
         if (type === SchemaType.Input) {
             return {
                 type: 'object',
@@ -36,6 +36,7 @@ export default class Task extends ETL {
                     },
                     'ADSBX_INCLUDES': {
                         type: 'array',
+                        // @ts-ignore
                         display: 'table',
                         description: 'Limit resultant features to a given list of ids',
                         items: {

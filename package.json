@@ -21,7 +21,7 @@
         "typescript": "^5.0.4"
     },
     "dependencies": {
-        "@tak-ps/etl": "^2.0.0",
+        "@tak-ps/etl": "^2.0.1",
         "@types/jsonwebtoken": "^9.0.1"
     }
 }
