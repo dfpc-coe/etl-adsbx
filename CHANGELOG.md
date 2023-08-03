@@ -10,6 +10,10 @@
 
 ## Version History
 
+### v2.0.1
+
+- :bug: await Schema calls
+
 ### v2.0.0
 
 - :rocket: Update to ETL-Base@2 to support output Schema
