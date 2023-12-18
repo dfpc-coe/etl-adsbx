@@ -10,6 +10,10 @@
 
 ## Version History
 
+### v2.0.3
+
+- :arrow_up: Update Push locations & Action Versions
+
 ### v2.0.2
 
 - :arrow_up: Update Core Deps
