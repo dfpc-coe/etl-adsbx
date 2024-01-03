@@ -210,7 +210,6 @@ export default class Task extends ETL {
 
         const known = await knownres.json();
 
-        //TODO: Implement
         console.log(`ok - comparing against ${known.features.length} aircraft`);
 
         const now = new Date().getTime();
