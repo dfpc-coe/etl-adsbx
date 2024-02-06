@@ -10,6 +10,10 @@
 
 ## Version History
 
+### v3.0.0
+
+- :rocket: Update to new token format
+
 ### v2.0.4
 
 - :arrow_up: Update deps
