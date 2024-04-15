@@ -1,108 +1,46 @@
 import fs from 'fs';
-import { JSONSchema6 } from 'json-schema';
+import { Type, TSchema } from '@sinclair/typebox';
 import {
     FeatureCollection,
     Feature
 } from 'geojson';
-import ETL, {
-    Event,
-    SchemaType
-} from '@tak-ps/etl';
-
-try {
-    const dotfile = new URL('.env', import.meta.url);
-
-    fs.accessSync(dotfile);
-
-    Object.assign(process.env, JSON.parse(String(fs.readFileSync(dotfile))));
-} catch (err) {
-    console.log('ok - no .env file loaded');
-}
+import ETL, { Event, SchemaType, handler as internal, local, env } from '@tak-ps/etl';
 
 export default class Task extends ETL {
-    static async schema(type: SchemaType = SchemaType.Input): Promise<JSONSchema6> {
+    async schema(type: SchemaType = SchemaType.Input): Promise<TSchema> {
         if (type === SchemaType.Input) {
-            return {
-                type: 'object',
-                required: ['ADSBX_TOKEN'],
-                properties: {
-                    'ADSBX_TOKEN': {
-                        type: 'string',
-                        description: 'API Token for ADSBExchange'
-                    },
-                    'RUNWAY_EXCLUDE': {
-                        type: 'string',
-                        description: 'Reverse Geocoding Layer for excluding aircraft that are on a known runway'
-                    },
-                    'ADSBX_INCLUDES': {
-                        type: 'array',
-                        // @ts-ignore
-                        display: 'table',
-                        description: 'Limit resultant features to a given list of ids',
-                        items: {
-                            type: 'object',
-                            properties: {
-                                domain: {
-                                    type: 'string',
-                                    description: 'Public Safety domain of the Aircraft',
-                                    enum: ['EMS', 'FIRE', 'LAW']
-                                },
-                                agency: {
-                                    type: 'string',
-                                    description: 'Agency in control of the Aircraft'
-                                },
-                                callsign: {
-                                    type: 'string',
-                                    description: 'Callsign of the Aircraft'
-                                },
-                                registration: {
-                                    type: 'string',
-                                    description: 'Registration Number of the Aircraft'
-                                },
-                                type: {
-                                    type: 'string',
-                                    description: 'Type of Aircraft',
-                                    enum: [
-                                        'HELICOPTER',
-                                        'FIXED WING'
-                                    ]
-                                },
-                                icon: {
-                                    type: 'string',
-                                    description: 'Optional TAK Custom Icon'
-                                }
-                            }
-                        }
-                    },
-                    'DEBUG': {
-                        type: 'boolean',
-                        default: false,
-                        description: 'Print ADSBX results in logs'
-                    }
-                }
-            }
+            return Type.Object({
+                'ADSBX_TOKEN': Type.String({ description: 'API Token for ADSBExchange' }),
+                'ADSBX_INCLUDES': Type.Array(Type.Object({
+                    domain: Type.String({
+                        description: 'Public Safety domain of the Aircraft',
+                        enum: ['EMS', 'FIRE', 'LAW']
+                    }),
+                    agency: Type.String({ description: 'Agency in control of the Aircraft' }),
+                    callsign: Type.String({ description: 'Callsign of the Aircraft' }),
+                    registration: Type.String({ description: 'Registration Number of the Aircraft' }),
+                    type: Type.String({
+                        description: 'Type of Aircraft',
+                        enum: [
+                            'HELICOPTER',
+                            'FIXED WING'
+                        ]
+                    }),
+                    icon: Type.String({ description: 'Optional TAK Custom Icon' })
+                })),
+                'DEBUG': Type.Boolean({ description: 'Print ADSBX results in logs', default: false })
+            })
         } else {
-            return {
-                type: 'object',
-                additionalProperties: false,
-                required: ['registration'],
-                properties: {
-                    registration: {
-                        type: 'string'
-                    },
-                    squak: {
-                        type: 'string'
-                    },
-                    emergency: {
-                        type: 'string'
-                    }
-                }
-            }
+            return Type.Object({
+                registration: Type.String(),
+                squak: Type.String(),
+                emergency: Type.String()
+            })
         }
     }
 
     async control() {
-        const layer = await this.layer();
+        const layer = await this.fetchLayer();
 
         if (!layer.environment.ADSBX_TOKEN) throw new Error('No ADSBX API Token Provided');
         if (!layer.environment.ADSBX_INCLUDES) layer.environment.ADSBX_INCLUDES = [];
@@ -144,10 +82,12 @@ export default class Task extends ETL {
                     callsign: (ac.flight || '').trim(),
                     time: new Date(),
                     start: new Date(),
-                    squak: ac.squak,
                     emergency: ac.emergency,
                     speed: ac.gs * 0.514444 || 9999999.0,
-                    course: ac.track || 9999999.0
+                    course: ac.track || 9999999.0,
+                    metadata: {
+                        squak: ac.squak,
+                    }
                 },
                 geometry: {
                     type: 'Point',
@@ -264,15 +204,9 @@ export default class Task extends ETL {
     }
 }
 
+env(import.meta.url)
+await local(new Task(), import.meta.url);
 export async function handler(event: Event = {}) {
-    if (event.type === 'schema:input') {
-        return await Task.schema(SchemaType.Input);
-    } else if (event.type === 'schema:output') {
-        return await Task.schema(SchemaType.Output);
-    } else {
-        const task = new Task();
-        await task.control();
-    }
+    return await internal(new Task(), event);
 }
 
-if (import.meta.url === `file://${process.argv[1]}`) handler();
