@@ -1,4 +1,3 @@
-import fs from 'fs';
 import { Type, TSchema } from '@sinclair/typebox';
 import {
     FeatureCollection,
