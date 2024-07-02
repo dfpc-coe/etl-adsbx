@@ -139,67 +139,6 @@ export default class Task extends ETL {
         };
 
         await this.submit(fc);
-
-        const knownres = await fetch(new URL(`/api/layer/${this.etl.layer}/query`, this.etl.api), {
-            method: 'GET',
-            headers: {
-                Authorization: `bearer ${this.etl.token}`
-            }
-        });
-
-        const known = await knownres.json();
-
-        console.log(`ok - comparing against ${known.features.length} aircraft`);
-
-        const now = new Date().getTime();
-        const alerts: Feature[] = [];
-        known.features.filter((kfeat: Feature) => {
-            // Ignore after 10 minutes
-            if (new Date(kfeat.properties.start).getTime() < (now - 600000)) return false;
-
-            // Ignore under 1 minute
-            if (new Date(kfeat.properties.start).getTime() > (now - 60000)) return false;
-
-            return true;
-        }).forEach((kfeat: Feature) => {
-            if (!features_ids.has(kfeat.id)) {
-                alerts.push(kfeat);
-            }
-        });
-
-        console.log(`ok - detected ${alerts.length} aircraft in alert`);
-        const alerts_fc: FeatureCollection = {
-            type: 'FeatureCollection',
-            features: alerts.map((kfeat) => {
-                // Mark Aircraft as "hostile" for now to differentiate
-                kfeat.properties.type = kfeat.properties.type.replace(/^a-f-/, 'a-h-');
-                kfeat.properties.time = new Date();
-                kfeat.properties.start = new Date();
-                kfeat.properties.stale = 14400000; // 4 Hours
-                kfeat.properties.remarks = `Unreported since: ${new Date()}`,
-                delete kfeat.properties.icon;
-                return kfeat;
-            })
-        };
-
-        console.log(`ok - posting ${alerts.length} alerts`);
-        if (alerts_fc.features.length) await this.submit(alerts_fc);
-        for (const alert of alerts) {
-            const mins = Math.round((now - new Date(alert.properties.start).getTime()) / 1000 / 60);
-
-            let priority = 'green';
-            if (mins <= 8 && mins > 2) priority = 'yellow';
-            if (mins > 8) priority = 'red';
-
-            const coords: string = (alert.geometry.type === 'Point' && alert.geometry.coordinates) ? alert.geometry.coordinates.join(',') : JSON.stringify(alert.geometry);
-
-            await this.alert({
-                title: `Missing: ${alert.id}`,
-                icon: 'alert-hexagon',
-                description: `Aircraft has been missing for ~${mins} minutes - Last Position: ${coords}`,
-                priority
-            });
-        }
     }
 }
 

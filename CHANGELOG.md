@@ -10,6 +10,10 @@
 
 ## Version History
 
+### v3.2.0
+
+- :arrow_up: Remove initial down detection in favour of striaght data flow
+
 ### v3.1.1
 
 - :arrow_up: Update to latest ETL Base
