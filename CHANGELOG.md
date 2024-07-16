@@ -10,6 +10,10 @@
 
 ## Version History
 
+### v4.0.1 - 2024-07-16
+
+- :bug: Fix internal typing
+
 ### v4.0.0 - 2024-07-16
 
 - :tada: Output all metadata to CloudTAK
