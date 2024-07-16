@@ -10,6 +10,13 @@
 
 ## Version History
 
+### v4.0.0 - 2024-07-16
+
+- :tada: Output all metadata to CloudTAK
+- :rocket: Add ability to set query lat/lng and dist
+- :rocket: Fully Typed input/output
+- :rocket: Leaner environment in favour of Style Editor in UI
+
 ### v3.2.0
 
 - :arrow_up: Remove initial down detection in favour of striaght data flow
