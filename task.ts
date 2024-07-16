@@ -13,21 +13,22 @@ const Env = Type.Object({
     }),
     'Query Dist': Type.String({
         description: 'Distance from the provided LatLon to provide results',
-        default: 2650
+        default: "2650"
     }),
-    'Dist': Type.String({ description: 'Lat, Lon value to use for centering the API request' }),
     'ADSBX_TOKEN': Type.String({ description: 'API Token for ADSBExchange' }),
     'ADSBX_INCLUDES': Type.Array(Type.Object({
         domain: Type.String({
             description: 'Public Safety domain of the Aircraft',
             enum: ['EMS', 'FIRE', 'LAW']
         }),
-        agency: Type.String({ description: 'Agency in control of the Aircraft' }),
-        callsign: Type.String({ description: 'Callsign of the Aircraft' }),
-        registration: Type.String({ description: 'Registration Number of the Aircraft' }),
+        agency: Type.Optional(Type.String({ description: 'Agency in control of the Aircraft' })),
+        callsign: Type.Optional(Type.String({ description: 'Callsign of the Aircraft' })),
+        registration: Type.Optional(Type.String({ description: 'Registration Number of the Aircraft' })),
         type: Type.String({
             description: 'Type of Aircraft',
+            default: 'UNKNOWN',
             enum: [
+                'UNKNOWN',
                 'HELICOPTER',
                 'FIXED WING'
             ]
@@ -42,21 +43,21 @@ const ADSBResponse = Type.Object({
     flight: Type.Optional(Type.String()),
     r: Type.Optional(Type.String()),
     t: Type.Optional(Type.String()),
-    alt_baro: Type.Number(),
-    alt_geom: Type.Number(),
-    gs: Type.Number(),
-    track: Type.Number(),
-    baro_rate: Type.Number(),
-    squawk: Type.String(),
-    category: Type.String(),
-    nav_qnh: Type.Number(),
-    nav_altitude_mcp: Type.Number(),
-    nav_heading: Type.Number(),
+    alt_baro: Type.Optional(Type.Union([Type.Number(), Type.String()])),
+    alt_geom: Type.Optional(Type.Number()),
+    gs: Type.Optional(Type.Number()),
+    track: Type.Optional(Type.Number()),
+    baro_rate: Type.Optional(Type.Number()),
+    squawk: Type.Optional(Type.String()),
+    category: Type.Optional(Type.String()),
+    nav_qnh: Type.Optional(Type.Number()),
+    nav_altitude_mcp: Type.Optional(Type.Number()),
+    nav_heading: Type.Optional(Type.Number()),
     lat: Type.Number(),
     lon: Type.Number(),
     seen_pos: Type.Number(),
     seen: Type.Number(),
-    dst: Type.Number()
+    dst: Type.Optional(Type.Number())
 })
 
 export default class Task extends ETL {
@@ -97,7 +98,7 @@ export default class Task extends ETL {
             const coordinates = [ac.lon, ac.lat];
 
             // If alt. is present convert to meters
-            coordinates.push(ac.alt_geom * 0.3048);
+            if (ac.alt_geom) coordinates.push(ac.alt_geom * 0.3048);
 
             if (!id.trim().length) continue;
 
