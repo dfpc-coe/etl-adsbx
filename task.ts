@@ -21,13 +21,32 @@ const Env = Type.Object({
         agency: Type.Optional(Type.String({ description: 'Agency in control of the Aircraft' })),
         callsign: Type.Optional(Type.String({ description: 'Callsign of the Aircraft' })),
         registration: Type.Optional(Type.String({ description: 'Registration Number of the Aircraft' })),
-        type: Type.String({
-            description: 'Type of Aircraft',
+        group: Type.String({
+            description: 'Category of Aircraft',
             default: 'UNKNOWN',
             enum: [
                 'UNKNOWN',
-                'HELICOPTER',
-                'FIXED WING'
+                'CIV_FIXED_CAP',
+                'CIV_UAS',
+                'EMS_ROTOR',
+                'EMS_ROTOR_RESCUE',
+                'FIRE_AIR_ATTACK',
+                'FIRE_AIR_TANKER',
+                'FIRE_INTEL',
+                'FIRE_LEAD_PLANE',
+                'FIRE_ROTOR',
+                'FIRE_ROTOR_AIR_ATTACK',
+                'FIRE_ROTOR_INTEL',
+                'FIRE_ROTOR_RESCUE',
+                'FIRE_SEAT',
+                'FIRE_SMOKE_JMPR',
+                'LAW_FIXED_WING',
+                'LAW_ROTOR_RESCUE',
+                'LE_FIXED_WING',
+                'LE_FIXED_WING_ISR',
+                'LE_ROTOR',
+                'LE_ROTOR_RESCUE',
+                'LE_UAS'
             ]
         }),
     })),
@@ -37,6 +56,10 @@ const Env = Type.Object({
 const ADSBResponse = Type.Object({
     hex: Type.String(),
     type: Type.String(),
+    group: Type.Optional(Type.String({
+        default: 'UNKNOWN',
+        description: 'Provided by the join with ADSBX_INCLUDES items'
+    })),
     flight: Type.Optional(Type.String()),
     r: Type.Optional(Type.String()),
     t: Type.Optional(Type.String()),
@@ -54,7 +77,7 @@ const ADSBResponse = Type.Object({
     lon: Type.Number(),
     seen_pos: Type.Number(),
     seen: Type.Number(),
-    dst: Type.Optional(Type.Number())
+    dst: Type.Optional(Type.Number()),
 })
 
 export default class Task extends ETL {
@@ -125,10 +148,14 @@ export default class Task extends ETL {
 
             if (ids.has(id)) {
                 const feat = ids.get(id);
-                if (include.type === 'HELICOPTER') feat.properties.type = 'a-f-A-C-H';
-                if (include.type === 'FIXED WING') feat.properties.type = 'a-f-A-C-F';
 
-                if (include.callsign) feat.properties.callsign = include.callsign;
+                if (include.callsign) {
+                    feat.properties.callsign = include.callsign;
+                }
+
+                if (include.group) {
+                    feat.properties.metadata.group = include.group;
+                }
 
                 if (!features_ids.has(id)) {
                     features_ids.add(id);

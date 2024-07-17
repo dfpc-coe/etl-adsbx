@@ -10,6 +10,10 @@
 
 ## Version History
 
+### v4.1.0 - 2024-07-17
+
+- :rocket: Add `group` types
+
 ### v4.0.1 - 2024-07-16
 
 - :bug: Fix internal typing
