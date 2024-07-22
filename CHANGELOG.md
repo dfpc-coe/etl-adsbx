@@ -10,6 +10,10 @@
 
 ## Version History
 
+### v4.2.0 - 2024-07-22
+
+- :rocket: Remove `agency` types
+
 ### v4.1.0 - 2024-07-17
 
 - :rocket: Add `group` types

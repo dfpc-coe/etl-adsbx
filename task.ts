@@ -18,7 +18,6 @@ const Env = Type.Object({
             description: 'Public Safety domain of the Aircraft',
             enum: ['EMS', 'FIRE', 'LAW']
         }),
-        agency: Type.Optional(Type.String({ description: 'Agency in control of the Aircraft' })),
         callsign: Type.Optional(Type.String({ description: 'Callsign of the Aircraft' })),
         registration: Type.Optional(Type.String({ description: 'Registration Number of the Aircraft' })),
         group: Type.String({
