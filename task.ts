@@ -12,6 +12,13 @@ const Env = Type.Object({
         description: 'Distance from the provided LatLon to provide results',
         default: "2650"
     }),
+    'ADSBX_API': Type.String({
+        enum: [
+            'https://adsbexchange-com1.p.rapidapi.com',
+            'https://adsbexchange.com/api/aircraft'
+        ],
+        default: 'https://adsbexchange.com/api/aircraft'
+    }),
     'ADSBX_TOKEN': Type.String({ description: 'API Token for ADSBExchange' }),
     'ADSBX_INCLUDES': Type.Array(Type.Object({
         domain: Type.String({
@@ -91,7 +98,7 @@ export default class Task extends ETL {
     async control() {
         const env = await this.env(Env);
 
-        const api = `https://adsbexchange.com/api/aircraft/v2/lat/${env['Query LatLon'].split(',')[0].trim()}/lon/${env['Query LatLon'].split(',')[1].trim()}/dist/${env['Query Dist']}/`;
+        const api = `${env.ADSBX_API}/v2/lat/${env['Query LatLon'].split(',')[0].trim()}/lon/${env['Query LatLon'].split(',')[1].trim()}/dist/${env['Query Dist']}/`;
 
         const url = new URL(api);
         url.searchParams.append('apiKey', env.ADSBX_TOKEN);
@@ -99,6 +106,7 @@ export default class Task extends ETL {
 
         const res = await fetch(url, {
             headers: {
+                'x-rapidapi-key': env.ADSBX_TOKEN,
                 'api-auth': env.ADSBX_TOKEN
             }
         });
