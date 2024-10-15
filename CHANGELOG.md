@@ -10,6 +10,10 @@
 
 ## Version History
 
+### v4.3.0 - 2024-10-15
+
+- :rocket: Add support for RapidAPI
+
 ### v4.2.0 - 2024-07-22
 
 - :rocket: Remove `agency` types
