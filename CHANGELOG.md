@@ -10,6 +10,10 @@
 
 ## Version History
 
+### v4.4.0 - 2024-10-17
+
+- :arrow_up: Update Core Deps
+
 ### v4.3.0 - 2024-10-15
 
 - :rocket: Add support for RapidAPI
