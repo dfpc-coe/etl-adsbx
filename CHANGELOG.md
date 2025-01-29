@@ -10,6 +10,10 @@
 
 ## Version History
 
+### v4.5.0 - 2025-01-29
+
+- :arrow_up: Update Core Deps
+
 ### v4.4.0 - 2024-10-17
 
 - :arrow_up: Update Core Deps

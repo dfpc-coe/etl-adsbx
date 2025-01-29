@@ -1,7 +1,6 @@
-import { Type, TSchema } from '@sinclair/typebox';
+import { Static, Type, TSchema } from '@sinclair/typebox';
 import { fetch } from '@tak-ps/etl'
-import { FeatureCollection } from 'geojson';
-import ETL, { Event, SchemaType, handler as internal, local, env } from '@tak-ps/etl';
+import ETL, { Event, SchemaType, handler as internal, local, InvocationType, DataFlowType, InputFeatureCollection } from '@tak-ps/etl';
 
 const Env = Type.Object({
     'Query LatLon': Type.String({
@@ -87,11 +86,22 @@ const ADSBResponse = Type.Object({
 })
 
 export default class Task extends ETL {
-    async schema(type: SchemaType = SchemaType.Input): Promise<TSchema> {
-        if (type === SchemaType.Input) {
-            return Env;
+    static name = 'etl-adsbx'
+    static flow = [ DataFlowType.Incoming ];
+    static invocation = [ InvocationType.Schedule ];
+
+    async schema(
+        type: SchemaType = SchemaType.Input,
+        flow: DataFlowType = DataFlowType.Incoming
+    ): Promise<TSchema> {
+        if (flow === DataFlowType.Incoming) { 
+            if (type === SchemaType.Input) {
+                return Env;
+            } else {
+                return ADSBResponse;
+            }
         } else {
-            return ADSBResponse;
+            return Type.Object({});
         }
     }
 
@@ -172,7 +182,7 @@ export default class Task extends ETL {
         }
 
         console.log(`ok - fetched ${ids.size} aircraft`);
-        const fc: FeatureCollection = {
+        const fc: Static<typeof InputFeatureCollection> = {
             type: 'FeatureCollection',
             features
         };
@@ -181,9 +191,8 @@ export default class Task extends ETL {
     }
 }
 
-env(import.meta.url)
-await local(new Task(), import.meta.url);
+await local(new Task(import.meta.url), import.meta.url);
 export async function handler(event: Event = {}) {
-    return await internal(new Task(), event);
+    return await internal(new Task(import.meta.url), event);
 }
 
