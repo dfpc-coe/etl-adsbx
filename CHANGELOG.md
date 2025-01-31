@@ -10,6 +10,10 @@
 
 ## Version History
 
+### v5.0.0
+
+- :tada: Update to `CloudTAK@v6`
+
 ### v4.5.0 - 2025-01-29
 
 - :arrow_up: Update Core Deps
