@@ -10,6 +10,10 @@
 
 ## Version History
 
+### v5.1.1
+
+- :tada: Fix submission format
+
 ### v5.1.0
 
 - :tada: Allow disablement of filters
