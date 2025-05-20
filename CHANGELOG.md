@@ -10,6 +10,10 @@
 
 ## Version History
 
+### v5.1.0
+
+- :tada: Allow disablement of filters
+
 ### v5.0.0
 
 - :tada: Update to `CloudTAK@v6`

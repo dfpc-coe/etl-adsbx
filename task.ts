@@ -19,6 +19,9 @@ const Env = Type.Object({
         default: 'https://adsbexchange.com/api/aircraft'
     }),
     'ADSBX_TOKEN': Type.String({ description: 'API Token for ADSBExchange' }),
+    'ADSBX_INCLUDES_FILTERING': Type.Boolean({
+        default: true
+    }),
     'ADSBX_INCLUDES': Type.Array(Type.Object({
         domain: Type.String({
             description: 'Public Safety domain of the Aircraft',
@@ -94,7 +97,7 @@ export default class Task extends ETL {
         type: SchemaType = SchemaType.Input,
         flow: DataFlowType = DataFlowType.Incoming
     ): Promise<TSchema> {
-        if (flow === DataFlowType.Incoming) { 
+        if (flow === DataFlowType.Incoming) {
             if (type === SchemaType.Input) {
                 return Env;
             } else {
@@ -160,19 +163,31 @@ export default class Task extends ETL {
 
         const features = [];
         const features_ids = new Set();
-        for (const include of env.ADSBX_INCLUDES) {
-            const id = include.registration.toLowerCase().trim();
 
-            if (ids.has(id)) {
+        if (env.ADSBX_INCLUDES_FILTERING) {
+            for (const include of env.ADSBX_INCLUDES) {
+                const id = include.registration.toLowerCase().trim();
+
+                if (ids.has(id)) {
+                    const feat = ids.get(id);
+
+                    if (include.callsign) {
+                        feat.properties.callsign = include.callsign;
+                    }
+
+                    if (include.group) {
+                        feat.properties.metadata.group = include.group;
+                    }
+
+                    if (!features_ids.has(id)) {
+                        features_ids.add(id);
+                        features.push(feat);
+                    }
+                }
+            }
+        } else {
+            for (const id of ids.values()) {
                 const feat = ids.get(id);
-
-                if (include.callsign) {
-                    feat.properties.callsign = include.callsign;
-                }
-
-                if (include.group) {
-                    feat.properties.metadata.group = include.group;
-                }
 
                 if (!features_ids.has(id)) {
                     features_ids.add(id);
