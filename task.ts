@@ -58,6 +58,7 @@ const Env = Type.Object({
             ]
         }),
     })),
+    'ADSBX_EMERGENCY_HOSTILE': Type.Boolean({ description: 'Mark flights in status "emergency" as "hostile". This allows them to appear in red on a TAK map.', default: false }),
     'DEBUG': Type.Boolean({ description: 'Print ADSBX results in logs', default: false })
 });
 
@@ -146,7 +147,7 @@ export default class Task extends ETL {
 
             // Determin the type of aircraft (fixed wing, rotorcraft, airship/balloon, etc.)
             // https://www.adsbexchange.com/emitter-category-ads-b-do-260b-2-2-3-2-5-2/
-            var ac_type = ''; // Unknown
+            let ac_type = ''; // Unknown
             switch (ac.category) {
                 case 'A0':  // No ADS-B emitter category information. Still used for some airplanes. 
                 case 'A1':  // Light (< 15500 lbs) fixed wing aircraft
@@ -169,15 +170,15 @@ export default class Task extends ETL {
 
             // Determine whether the aircraft is civilian or military
             // https://www.adsbexchange.com/version-2-api-wip/
-            var ac_civmil = '-C'; // Civilian
+            let ac_civmil = '-C'; // Civilian
             if (ac.dbFlags !== undefined && ac.dbFlags % 2 !== 0) {
                 ac_civmil = '-M'; // Military
             }
 
             // Determine whether the aircraft is in emergency mode (show in red aka. "hostile") or not
             // https://www.adsbexchange.com/version-2-api-wip/
-            var ac_emergency = '-f'; // Normal
-            if (ac.emergency !== undefined && ac.emergency !== 'none') {
+            let ac_emergency = '-f'; // Normal
+            if (ac.emergency !== undefined && ac.emergency !== 'none' && env.ADSBX_EMERGENCY_HOSTILE) {
                 ac_emergency = '-h'; // Emergency
             }
 
@@ -191,7 +192,8 @@ export default class Task extends ETL {
                     start: new Date(),
                     speed: ac.gs * 0.514444 || 9999999.0,
                     course: ac.track || 9999999.0,
-                    metadata: ac
+                    metadata: ac,
+                    remarks: 'Flight: ' + (ac.flight || '').trim() + ' - Registration: ' + (ac.r || '').trim() + ' - Type: ' + ac.t + ' - Category: ' + ac.category + ' - Emergency: ' + (ac.emergency || '').trim() + ' - Squawk: ' + (ac.squawk || '').trim(),
                 },
                 geometry: {
                     type: 'Point',
