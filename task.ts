@@ -149,7 +149,7 @@ export default class Task extends ETL {
             // https://www.adsbexchange.com/emitter-category-ads-b-do-260b-2-2-3-2-5-2/
             let ac_type = ''; // Unknown
             switch (ac.category) {
-                case 'A0':  // No ADS-B emitter category information. Still used for some airplanes. 
+                case 'A0':  // No ADS-B emitter category information. Still used for some airplanes.
                 case 'A1':  // Light (< 15500 lbs) fixed wing aircraft
                 case 'A2':  // Small (15500-75000 lbs) fixed wing aircraft
                 case 'A3':  // Large (75000 to 300000 lbs) fixed wing aircraft
@@ -193,7 +193,14 @@ export default class Task extends ETL {
                     speed: ac.gs * 0.514444 || 9999999.0,
                     course: ac.track || 9999999.0,
                     metadata: ac,
-                    remarks: 'Flight: ' + (ac.flight || 'Unknown').trim() + ' - Registration: ' + (ac.r || 'Unknown').trim() + ' - Type: ' + (ac.t || 'Unknown').trim() + ' - Category: ' + (ac.category || 'Unknown').trim() + ' - Emergency: ' + (ac.emergency || 'Unknown').trim() + ' - Squawk: ' + (ac.squawk || 'Unknown').trim(),
+                    remarks: [
+                        'Flight: ' + (ac.flight || 'Unknown').trim(),
+                        'Registration: ' + (ac.r || 'Unknown').trim(),
+                        'Type: ' + (ac.t || 'Unknown').trim(),
+                        'Category: ' + (ac.category || 'Unknown').trim(),
+                        'Emergency: ' + (ac.emergency || 'Unknown').trim(),
+                        'Squawk: ' + (ac.squawk || 'Unknown').trim(),
+                    ].join('\n')
                 },
                 geometry: {
                     type: 'Point',
