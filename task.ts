@@ -20,7 +20,7 @@ const Env = Type.Object({
     }),
     'ADSBX_TOKEN': Type.String({ description: 'API Token for ADSBExchange' }),
     'ADSBX_INCLUDES_FILTERING': Type.Boolean({
-        default: true
+        default: false
     }),
     'ADSBX_INCLUDES': Type.Array(Type.Object({
         domain: Type.String({
@@ -193,7 +193,7 @@ export default class Task extends ETL {
                     speed: ac.gs * 0.514444 || 9999999.0,
                     course: ac.track || 9999999.0,
                     metadata: ac,
-                    remarks: 'Flight: ' + (ac.flight || '').trim() + ' - Registration: ' + (ac.r || '').trim() + ' - Type: ' + ac.t + ' - Category: ' + ac.category + ' - Emergency: ' + (ac.emergency || '').trim() + ' - Squawk: ' + (ac.squawk || '').trim(),
+                    remarks: 'Flight: ' + (ac.flight || 'Unknown').trim() + ' - Registration: ' + (ac.r || 'Unknown').trim() + ' - Type: ' + (ac.t || 'Unknown').trim() + ' - Category: ' + (ac.category || 'Unknown').trim() + ' - Emergency: ' + (ac.emergency || 'Unknown').trim() + ' - Squawk: ' + (ac.squawk || 'Unknown').trim(),
                 },
                 geometry: {
                     type: 'Point',
