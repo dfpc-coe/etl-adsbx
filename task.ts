@@ -8,7 +8,7 @@ const Env = Type.Object({
         default: '40.14401,-119.81204'
     }),
     'Query Dist': Type.String({
-        description: 'Distance from the provided LatLon to provide results',
+        description: 'Distance from the provided Lat, Lon location in nautical miles (NM) to provide results',
         default: "2650"
     }),
     'ADSBX_API': Type.String({
@@ -71,12 +71,14 @@ const ADSBResponse = Type.Object({
     flight: Type.Optional(Type.String()),
     r: Type.Optional(Type.String()),
     t: Type.Optional(Type.String()),
+    dbFlags: Type.Optional(Type.Number()),
     alt_baro: Type.Optional(Type.Union([Type.Number(), Type.String()])),
     alt_geom: Type.Optional(Type.Number()),
     gs: Type.Optional(Type.Number()),
     track: Type.Optional(Type.Number()),
     baro_rate: Type.Optional(Type.Number()),
     squawk: Type.Optional(Type.String()),
+    emergency: Type.Optional(Type.String()),
     category: Type.Optional(Type.String()),
     nav_qnh: Type.Optional(Type.Number()),
     nav_altitude_mcp: Type.Optional(Type.Number()),
@@ -142,11 +144,48 @@ export default class Task extends ETL {
 
             if (!id.trim().length) continue;
 
+            // Determin the type of aircraft (fixed wing, rotorcraft, airship/balloon, etc.)
+            // https://www.adsbexchange.com/emitter-category-ads-b-do-260b-2-2-3-2-5-2/
+            var ac_type = ''; // Unknown
+            switch (ac.category) {
+                case 'A0':  // No ADS-B emitter category information. Still used for some airplanes. 
+                case 'A1':  // Light (< 15500 lbs) fixed wing aircraft
+                case 'A2':  // Small (15500-75000 lbs) fixed wing aircraft
+                case 'A3':  // Large (75000 to 300000 lbs) fixed wing aircraft
+                case 'A4':  // High vortex large (aircraft such as B-757) fixed wing aircraft
+                case 'A5':  // Heavy (> 300000 lbs) fixed wing aircraft
+                case 'A6':  // High performance (> 5g acceleration and 400 kts) fixed wing aircraft
+                    ac_type = '-F'; // Fixed Wing
+                    break;
+                case 'A7':
+                    ac_type = '-H'; // Rotorcraft – Any rotorcraft regardless of weight.
+                    break;
+                case 'B2':
+                    ac_type = '-L'; // Lighter-than-air – Any lighter than air (airship or balloon) regardless of weight.
+                    break;
+                default:
+                    break;
+            }
+
+            // Determine whether the aircraft is civilian or military
+            // https://www.adsbexchange.com/version-2-api-wip/
+            var ac_civmil = '-C'; // Civilian
+            if (ac.dbFlags !== undefined && ac.dbFlags % 2 !== 0) {
+                ac_civmil = '-M'; // Military
+            }
+
+            // Determine whether the aircraft is in emergency mode (show in red aka. "hostile") or not
+            // https://www.adsbexchange.com/version-2-api-wip/
+            var ac_emergency = '-f'; // Normal
+            if (ac.emergency !== 'none') {
+                ac_emergency = '-h'; // Emergency
+            }
+
             ids.set(id, {
                 id: id,
                 type: 'Feature',
                 properties: {
-                    type: 'a-f-A',
+                    type: 'a' + ac_emergency + '-A' + ac_civmil + ac_type,
                     callsign: (ac.flight || '').trim(),
                     time: new Date(),
                     start: new Date(),
