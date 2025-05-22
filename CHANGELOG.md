@@ -10,6 +10,12 @@
 
 ## Version History
 
+### v5.2.0
+
+- :tada: Add option to style by hostile when in an emergency
+- :rocket: Include aircraft type in output
+- :rocket: Include aircraft ownership military/civilian in output
+
 ### v5.1.1
 
 - :tada: Fix submission format
