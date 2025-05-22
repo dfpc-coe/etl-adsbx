@@ -20,7 +20,7 @@ const Env = Type.Object({
     }),
     'ADSBX_TOKEN': Type.String({ description: 'API Token for ADSBExchange' }),
     'ADSBX_INCLUDES_FILTERING': Type.Boolean({
-        default: false
+        default: true
     }),
     'ADSBX_INCLUDES': Type.Array(Type.Object({
         domain: Type.String({
