@@ -177,7 +177,7 @@ export default class Task extends ETL {
             // Determine whether the aircraft is in emergency mode (show in red aka. "hostile") or not
             // https://www.adsbexchange.com/version-2-api-wip/
             var ac_emergency = '-f'; // Normal
-            if (ac.emergency !== 'none') {
+            if (ac.emergency !== undefined && ac.emergency !== 'none') {
                 ac_emergency = '-h'; // Emergency
             }
 
