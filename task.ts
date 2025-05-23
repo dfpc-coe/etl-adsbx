@@ -20,22 +20,34 @@ const Env = Type.Object({
     }),
     'ADSBX_TOKEN': Type.String({ description: 'API Token for ADSBExchange' }),
     'ADSBX_INCLUDES_FILTERING': Type.Boolean({
+        description: 'Only show aircraft from the ADSBX_INCLUDES list. This is useful for filtering out large amounts of aircraft in an area.',
+        default: true
+    }),
+    'ADSBX_INCLUDES_ICON': Type.Boolean({ 
+        description: 'Change aircraft icon based on the group provided in ADSBX_INCLUDES, even when filtering is disabled.',
         default: true
     }),
     'ADSBX_INCLUDES': Type.Array(Type.Object({
         domain: Type.String({
             description: 'Public Safety domain of the Aircraft',
-            enum: ['EMS', 'FIRE', 'LAW']
+            enum: ['EMS', 'FIRE', 'LAW', 'FED', 'MIL'],
         }),
-        callsign: Type.Optional(Type.String({ description: 'Callsign of the Aircraft' })),
-        registration: Type.Optional(Type.String({ description: 'Registration Number of the Aircraft' })),
+        callsign: Type.Optional(Type.String({ description: 'Callsign of the Aircraft.' })),
+        registration: Type.Optional(Type.String({ description: 'Registration Number of the Aircraft.' })),
         group: Type.String({
-            description: 'Category of Aircraft',
+            description: 'Category of Aircraft. This is used to determine the icon to use for the aircraft.',
             default: 'UNKNOWN',
             enum: [
                 'UNKNOWN',
                 'CIV_FIXED_CAP',
+                'CIV_FIXED_ISR',
+                'CIV_LTA_AIRSHIP',
+                'CIV_LTA_BALLOON',
+                'CIV_LTA_TETHERED',
+                'CIV_ROTOR_ISR',
                 'CIV_UAS',
+                'CIV_UAS_ROTOR',
+                'EMS_FIXED_WING',
                 'EMS_ROTOR',
                 'EMS_ROTOR_RESCUE',
                 'FIRE_AIR_ATTACK',
@@ -48,25 +60,40 @@ const Env = Type.Object({
                 'FIRE_ROTOR_RESCUE',
                 'FIRE_SEAT',
                 'FIRE_SMOKE_JMPR',
-                'LAW_FIXED_WING',
-                'LAW_ROTOR_RESCUE',
+                'FIRE_UAS',
                 'LE_FIXED_WING',
                 'LE_FIXED_WING_ISR',
                 'LE_ROTOR',
                 'LE_ROTOR_RESCUE',
-                'LE_UAS'
+                'LE_UAS',
+                'FED_FIXED_WING',
+                'FED_FIXED_WING_ISR',
+                'FED_ROTOR',
+                'FED_ROTOR_RESCUE',
+                'FED_UAS',
+                'MIL_ROTOR_MED_RESCUE',
+                'MIL_ROTOR_ISR_RESCUE'
             ]
         }),
     })),
-    'ADSBX_EMERGENCY_HOSTILE': Type.Boolean({ description: 'Mark flights in status "emergency" as "hostile". This allows them to appear in red on a TAK map.', default: false }),
-    'DEBUG': Type.Boolean({ description: 'Print ADSBX results in logs', default: false })
+    'ADSBX_EMERGENCY_HOSTILE': Type.Boolean({ 
+        description: 'Mark flights in status "emergency" as "hostile". This allows them to appear in red on a TAK map.', 
+        default: false 
+    }),
+    'ADSBX_Ignore_Tower_Vehicles': Type.Boolean({
+        description: 'Ignore tower vehicles (TWR) and ground vehicles (GND).',
+        default: true
+    }),
+    'DEBUG': Type.Boolean({ 
+        description: 'Print ADSBX results in logs.', 
+        default: false })
 });
 
 const ADSBResponse = Type.Object({
     hex: Type.String(),
     type: Type.String(),
     group: Type.Optional(Type.String({
-        default: 'UNKNOWN',
+        default: 'None',
         description: 'Provided by the join with ADSBX_INCLUDES items'
     })),
     flight: Type.Optional(Type.String()),
@@ -137,6 +164,8 @@ export default class Task extends ETL {
         for (const ac of body.ac) {
             if (!ac.flight && !ac.r) continue;
 
+            if (env.ADSBX_Ignore_Tower_Vehicles && (ac.r == 'TWR' || ac.r == 'GND')) continue; // Ignore tower and ground vehicles
+
             const id = (ac.r || ac.flight).toLowerCase().trim();
             const coordinates = [ac.lon, ac.lat];
 
@@ -177,9 +206,16 @@ export default class Task extends ETL {
 
             // Determine whether the aircraft is in emergency mode (show in red aka. "hostile") or not
             // https://www.adsbexchange.com/version-2-api-wip/
-            let ac_emergency = '-f'; // Normal
+            let ac_emergency = '-f'; // Normal (Friendly)
             if (ac.emergency !== undefined && ac.emergency !== 'none' && env.ADSBX_EMERGENCY_HOSTILE) {
                 ac_emergency = '-h'; // Emergency
+            }
+
+            for (const include of env.ADSBX_INCLUDES) {
+                const markup = include.registration.toLowerCase().trim();
+                if (id == markup) {
+                    ac.group = include.group;
+                }
             }
 
             ids.set(id, {
@@ -190,7 +226,7 @@ export default class Task extends ETL {
                     callsign: (ac.flight || '').trim(),
                     time: new Date(),
                     start: new Date(),
-                    speed: ac.gs * 0.514444 || 9999999.0,
+                    speed: ac.gs * 0.514444 || 0,
                     course: ac.track || 9999999.0,
                     metadata: ac,
                     remarks: [
@@ -200,6 +236,7 @@ export default class Task extends ETL {
                         'Category: ' + (ac.category || 'Unknown').trim(),
                         'Emergency: ' + (ac.emergency || 'Unknown').trim(),
                         'Squawk: ' + (ac.squawk || 'Unknown').trim(),
+                        'Group: ' + (ac.group || 'None').replace(/_/g,"-").trim(),  // CloudTAK formats "xx_yy_zz" as "xxyyzz" with yy being italics
                     ].join('\n')
                 },
                 geometry: {
@@ -207,6 +244,11 @@ export default class Task extends ETL {
                     coordinates
                 }
             });
+
+            const feat = ids.get(id);
+            if (ac.group && ac.group !== 'UNKNOWN' && ac.group !== 'None' && env.ADSBX_INCLUDES_ICON) {
+                feat.properties.icon = '66f14976-4b62-4023-8edb-d8d2ebeaa336/Public Safety Air/' + ac.group + '.png';
+            }
         }
 
         const features = [];
@@ -235,7 +277,7 @@ export default class Task extends ETL {
             }
         } else {
             for (const feat of ids.values()) {
-
+                
                 if (!features_ids.has(feat.id)) {
                     features_ids.add(feat.id);
                     features.push(feat);
