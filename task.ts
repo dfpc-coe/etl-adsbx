@@ -80,6 +80,10 @@ const Env = Type.Object({
         description: 'Mark flights in status "emergency" as "hostile". This allows them to appear in red on a TAK map.', 
         default: false 
     }),
+    'ADSBX_Ignore_Tower_Vehicles': Type.Boolean({
+        description: 'Ignore tower vehicles (TWR) and ground vehicles (GND).',
+        default: true
+    }),
     'DEBUG': Type.Boolean({ 
         description: 'Print ADSBX results in logs.', 
         default: false })
@@ -159,6 +163,8 @@ export default class Task extends ETL {
 
         for (const ac of body.ac) {
             if (!ac.flight && !ac.r) continue;
+
+            if (env.ADSBX_Ignore_Tower_Vehicles && (ac.r == 'TWR' || ac.r == 'GND')) continue; // Ignore tower and ground vehicles
 
             const id = (ac.r || ac.flight).toLowerCase().trim();
             const coordinates = [ac.lon, ac.lat];
