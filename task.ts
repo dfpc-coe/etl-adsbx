@@ -226,7 +226,7 @@ export default class Task extends ETL {
                     callsign: (ac.flight || '').trim(),
                     time: new Date(),
                     start: new Date(),
-                    speed: ac.gs * 0.514444 || 9999999.0,
+                    speed: ac.gs * 0.514444 || 0,
                     course: ac.track || 9999999.0,
                     metadata: ac,
                     remarks: [
