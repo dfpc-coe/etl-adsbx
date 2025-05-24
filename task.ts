@@ -84,6 +84,14 @@ const Env = Type.Object({
         description: 'Ignore tower vehicles (TWR) and ground vehicles (GND).',
         default: true
     }),
+    'ADSBX_ICAOHex_Domestic_Start': Type.String({ 
+        description: 'ICAO HEX start value for domestic flights. E.g. A00000 for USA.', 
+        default: 'A00000'
+    }),
+    'ADSBX_ICAOHex_Domestic_End': Type.String({ 
+        description: 'ICAO HEX start value for domestic flights. E.g. AFFFFF for USA.', 
+        default: 'AFFFFF'
+    }),
     'DEBUG': Type.Boolean({ 
         description: 'Print ADSBX results in logs.', 
         default: false })
@@ -197,18 +205,34 @@ export default class Task extends ETL {
                     break;
             }
 
+            // Determine whether the aircraft is a domestic or foreign flight
+            // Based on the ICAO Hex code, which is a 6-character alphanumeric code assigned to each aircraft
+            // https://www.aerotransport.org/html/ICAO_hex_decode.html
+            let ac_affiliation = '-f'; // Friendly (Local)
+            if (ac.hex.toLowerCase().trim() >= env.ADSBX_ICAOHex_Domestic_Start.toLowerCase().trim() &&
+                ac.hex.toLowerCase().trim() <= env.ADSBX_ICAOHex_Domestic_End.toLowerCase().trim()) {
+                ac_affiliation = '-f'; // Friendly (Local civilian)
+            } else {
+                ac_affiliation = '-n'; // Neutral (Foreign civilian)
+            }
+
             // Determine whether the aircraft is civilian or military
             // https://www.adsbexchange.com/version-2-api-wip/
             let ac_civmil = '-C'; // Civilian
             if (ac.dbFlags !== undefined && ac.dbFlags % 2 !== 0) {
                 ac_civmil = '-M'; // Military
+                if (ac.hex.toLowerCase().trim() >= env.ADSBX_ICAOHex_Domestic_Start.toLowerCase().trim() &&
+                ac.hex.toLowerCase().trim() <= env.ADSBX_ICAOHex_Domestic_End.toLowerCase().trim()) {
+                    ac_affiliation = '-f'; // Friendly (Local Military)
+                } else {
+                    ac_affiliation = '-u'; // Unknown (Foreign Military)
+                }
             }
 
             // Determine whether the aircraft is in emergency mode (show in red aka. "hostile") or not
             // https://www.adsbexchange.com/version-2-api-wip/
-            let ac_emergency = '-f'; // Normal (Friendly)
             if (ac.emergency !== undefined && ac.emergency !== 'none' && env.ADSBX_EMERGENCY_HOSTILE) {
-                ac_emergency = '-h'; // Emergency
+                ac_affiliation = '-h'; // Emergency
             }
 
             for (const include of env.ADSBX_INCLUDES) {
@@ -222,7 +246,7 @@ export default class Task extends ETL {
                 id: id,
                 type: 'Feature',
                 properties: {
-                    type: 'a' + ac_emergency + '-A' + ac_civmil + ac_type,
+                    type: 'a' + ac_affiliation + '-A' + ac_civmil + ac_type,
                     callsign: (ac.flight || '').trim(),
                     time: new Date(),
                     start: new Date(),
