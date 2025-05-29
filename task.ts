@@ -301,7 +301,7 @@ export default class Task extends ETL {
             }
         } else {
             for (const feat of ids.values()) {
-                
+
                 if (!features_ids.has(feat.id)) {
                     features_ids.add(feat.id);
                     features.push(feat);
