@@ -10,6 +10,10 @@
 
 ## Version History
 
+### v5.2.1
+
+- :arrow_up: Update Core Deps
+
 ### v5.2.0
 
 - :tada: Add option to style by hostile when in an emergency
