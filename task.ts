@@ -20,22 +20,34 @@ const Env = Type.Object({
     }),
     'ADSBX_TOKEN': Type.String({ description: 'API Token for ADSBExchange' }),
     'ADSBX_INCLUDES_FILTERING': Type.Boolean({
+        description: 'Only show aircraft from the ADSBX_INCLUDES list. This is useful for filtering out large amounts of aircraft in an area.',
+        default: true
+    }),
+    'ADSBX_INCLUDES_ICON': Type.Boolean({ 
+        description: 'Change aircraft icon based on the group provided in ADSBX_INCLUDES, even when filtering is disabled.',
         default: true
     }),
     'ADSBX_INCLUDES': Type.Array(Type.Object({
         domain: Type.String({
             description: 'Public Safety domain of the Aircraft',
-            enum: ['EMS', 'FIRE', 'LAW']
+            enum: ['EMS', 'FIRE', 'LAW', 'FED', 'MIL'],
         }),
-        callsign: Type.Optional(Type.String({ description: 'Callsign of the Aircraft' })),
-        registration: Type.Optional(Type.String({ description: 'Registration Number of the Aircraft' })),
+        callsign: Type.Optional(Type.String({ description: 'Callsign of the Aircraft.' })),
+        registration: Type.Optional(Type.String({ description: 'Registration Number of the Aircraft.' })),
         group: Type.String({
-            description: 'Category of Aircraft',
+            description: 'Category of Aircraft. This is used to determine the icon to use for the aircraft.',
             default: 'UNKNOWN',
             enum: [
                 'UNKNOWN',
                 'CIV_FIXED_CAP',
+                'CIV_FIXED_ISR',
+                'CIV_LTA_AIRSHIP',
+                'CIV_LTA_BALLOON',
+                'CIV_LTA_TETHERED',
+                'CIV_ROTOR_ISR',
                 'CIV_UAS',
+                'CIV_UAS_ROTOR',
+                'EMS_FIXED_WING',
                 'EMS_ROTOR',
                 'EMS_ROTOR_RESCUE',
                 'FIRE_AIR_ATTACK',
@@ -48,25 +60,48 @@ const Env = Type.Object({
                 'FIRE_ROTOR_RESCUE',
                 'FIRE_SEAT',
                 'FIRE_SMOKE_JMPR',
-                'LAW_FIXED_WING',
-                'LAW_ROTOR_RESCUE',
+                'FIRE_UAS',
                 'LE_FIXED_WING',
                 'LE_FIXED_WING_ISR',
                 'LE_ROTOR',
                 'LE_ROTOR_RESCUE',
-                'LE_UAS'
+                'LE_UAS',
+                'FED_FIXED_WING',
+                'FED_FIXED_WING_ISR',
+                'FED_ROTOR',
+                'FED_ROTOR_RESCUE',
+                'FED_UAS',
+                'MIL_ROTOR_MED_RESCUE',
+                'MIL_ROTOR_ISR_RESCUE'
             ]
         }),
     })),
-    'ADSBX_EMERGENCY_HOSTILE': Type.Boolean({ description: 'Mark flights in status "emergency" as "hostile". This allows them to appear in red on a TAK map.', default: false }),
-    'DEBUG': Type.Boolean({ description: 'Print ADSBX results in logs', default: false })
+    'ADSBX_EMERGENCY_HOSTILE': Type.Boolean({ 
+        description: 'Mark flights in status "emergency" as "hostile". This allows them to appear in red on a TAK map.', 
+        default: false 
+    }),
+    'ADSBX_Ignore_Tower_Vehicles': Type.Boolean({
+        description: 'Ignore tower vehicles (TWR) and ground vehicles (GND).',
+        default: true
+    }),
+    'ADSBX_ICAOHex_Domestic_Start': Type.String({ 
+        description: 'ICAO HEX start value for domestic flights. E.g. A00000 for USA.', 
+        default: 'A00000'
+    }),
+    'ADSBX_ICAOHex_Domestic_End': Type.String({ 
+        description: 'ICAO HEX start value for domestic flights. E.g. AFFFFF for USA.', 
+        default: 'AFFFFF'
+    }),
+    'DEBUG': Type.Boolean({ 
+        description: 'Print ADSBX results in logs.', 
+        default: false })
 });
 
 const ADSBResponse = Type.Object({
     hex: Type.String(),
     type: Type.String(),
     group: Type.Optional(Type.String({
-        default: 'UNKNOWN',
+        default: 'None',
         description: 'Provided by the join with ADSBX_INCLUDES items'
     })),
     flight: Type.Optional(Type.String()),
@@ -137,6 +172,8 @@ export default class Task extends ETL {
         for (const ac of body.ac) {
             if (!ac.flight && !ac.r) continue;
 
+            if (env.ADSBX_Ignore_Tower_Vehicles && (ac.r == 'TWR' || ac.r == 'GND')) continue; // Ignore tower and ground vehicles
+
             const id = (ac.r || ac.flight).toLowerCase().trim();
             const coordinates = [ac.lon, ac.lat];
 
@@ -168,29 +205,52 @@ export default class Task extends ETL {
                     break;
             }
 
+            // Determine whether the aircraft is a domestic or foreign flight
+            // Based on the ICAO Hex code, which is a 6-character alphanumeric code assigned to each aircraft
+            // https://www.aerotransport.org/html/ICAO_hex_decode.html
+            let ac_affiliation = '-f'; // Friendly (Local)
+            if (ac.hex.toLowerCase().trim() >= env.ADSBX_ICAOHex_Domestic_Start.toLowerCase().trim() &&
+                ac.hex.toLowerCase().trim() <= env.ADSBX_ICAOHex_Domestic_End.toLowerCase().trim()) {
+                ac_affiliation = '-f'; // Friendly (Local civilian)
+            } else {
+                ac_affiliation = '-n'; // Neutral (Foreign civilian)
+            }
+
             // Determine whether the aircraft is civilian or military
             // https://www.adsbexchange.com/version-2-api-wip/
             let ac_civmil = '-C'; // Civilian
             if (ac.dbFlags !== undefined && ac.dbFlags % 2 !== 0) {
                 ac_civmil = '-M'; // Military
+                if (ac.hex.toLowerCase().trim() >= env.ADSBX_ICAOHex_Domestic_Start.toLowerCase().trim() &&
+                ac.hex.toLowerCase().trim() <= env.ADSBX_ICAOHex_Domestic_End.toLowerCase().trim()) {
+                    ac_affiliation = '-f'; // Friendly (Local Military)
+                } else {
+                    ac_affiliation = '-u'; // Unknown (Foreign Military)
+                }
             }
 
             // Determine whether the aircraft is in emergency mode (show in red aka. "hostile") or not
             // https://www.adsbexchange.com/version-2-api-wip/
-            let ac_emergency = '-f'; // Normal
             if (ac.emergency !== undefined && ac.emergency !== 'none' && env.ADSBX_EMERGENCY_HOSTILE) {
-                ac_emergency = '-h'; // Emergency
+                ac_affiliation = '-h'; // Emergency
+            }
+
+            for (const include of env.ADSBX_INCLUDES) {
+                const markup = include.registration.toLowerCase().trim();
+                if (id == markup) {
+                    ac.group = include.group;
+                }
             }
 
             ids.set(id, {
                 id: id,
                 type: 'Feature',
                 properties: {
-                    type: 'a' + ac_emergency + '-A' + ac_civmil + ac_type,
+                    type: 'a' + ac_affiliation + '-A' + ac_civmil + ac_type,
                     callsign: (ac.flight || '').trim(),
                     time: new Date(),
                     start: new Date(),
-                    speed: ac.gs * 0.514444 || 9999999.0,
+                    speed: ac.gs * 0.514444 || 0,
                     course: ac.track || 9999999.0,
                     metadata: ac,
                     remarks: [
@@ -200,6 +260,7 @@ export default class Task extends ETL {
                         'Category: ' + (ac.category || 'Unknown').trim(),
                         'Emergency: ' + (ac.emergency || 'Unknown').trim(),
                         'Squawk: ' + (ac.squawk || 'Unknown').trim(),
+                        'Group: ' + (ac.group || 'None').replace(/_/g,"-").trim(),  // CloudTAK formats "xx_yy_zz" as "xxyyzz" with yy being italics
                     ].join('\n')
                 },
                 geometry: {
@@ -207,6 +268,14 @@ export default class Task extends ETL {
                     coordinates
                 }
             });
+
+            // If the aircraft has a group, set the icon based on the group from the 'Public Safety Air' icon set
+            // https://tak.gov/public-safety-air-icons/
+            // This is used to display different icons for different types of public safety aircraft    
+            const feat = ids.get(id);
+            if (ac.group && ac.group !== 'UNKNOWN' && ac.group !== 'None' && env.ADSBX_INCLUDES_ICON) {
+                feat.properties.icon = '66f14976-4b62-4023-8edb-d8d2ebeaa336/Public Safety Air/' + ac.group + '.png';
+            }
         }
 
         const features = [];
