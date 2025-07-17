@@ -172,7 +172,7 @@ export default class Task extends ETL {
         for (const ac of body.ac) {
             if (!ac.flight && !ac.r) continue;
 
-            if (env.ADSBX_Ignore_Tower_Vehicles && (ac.r == 'TWR' || ac.r == 'GND')) continue; // Ignore tower and ground vehicles
+            if (env.ADSBX_Ignore_Tower_Vehicles && (ac.r == 'TWR' || ac.r == 'GND' || ac.type == 'adsb_icao_nt' )) continue; // Ignore tower, ground vehicles and test equipment
 
             const id = (ac.r || ac.flight).toLowerCase().trim();
             const coordinates = [ac.lon, ac.lat];
