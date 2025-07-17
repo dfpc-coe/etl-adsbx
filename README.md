@@ -6,6 +6,10 @@
 
 [ADSBExchange.com](https://www.adsbexchange.com/)
 
+## Example Data
+
+![EAircraft location data via ADS-B](docs/etl-adsbx.png)
+
 ## Deployment
 
 Deployment into the CloudTAK environment for ETL tasks is done via automatic releases to the TAK.NZ AWS environment.
