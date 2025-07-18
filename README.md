@@ -6,7 +6,11 @@
 
 [ADSBExchange.com](https://www.adsbexchange.com/)
 
-### Supported icons for public safety aircraft
+## Example Data
+
+![EAircraft location data via ADS-B](docs/etl-adsbx.png)
+
+## Supported icons for public safety aircraft
 * a-f-A-M-F-A = Friendly Military Fixed Wing - Attack Aircraft
 * a-f-A-M-F-C = Friendly Military Fixed Wing - Cargo Aircraft
 * a-f-A-M-F-J = Friendly Military Fixed Wing - Jammer Aircraft
@@ -58,10 +62,6 @@
 * FED_UAS = Federal Agency Unmanned Aircraft System
 * MIL_ROTOR_MED_RESCUE = Military Medical Rescue Helicopter
 * MIL_ROTOR_ISR_RESCUE = Military ISR/Rescue Helicopter
-
-## Example Data
-
-![EAircraft location data via ADS-B](docs/etl-adsbx.png)
 
 ## Deployment
 
