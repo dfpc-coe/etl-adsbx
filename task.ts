@@ -292,6 +292,11 @@ export default class Task extends ETL {
             const feat = ids.get(id);
             if (ac.group && ac.group !== 'UNKNOWN' && ac.group !== 'None' && env.ADSBX_INCLUDES_ICON) {
                 feat.properties.icon = '66f14976-4b62-4023-8edb-d8d2ebeaa336/Public Safety Air/' + ac.group + '.png';
+                // If the group starts with 'a-', it's a military symbol code (e.g., a-f-A-M-F-R), so use it directly as the type
+                // This allows proper military symbology to be displayed in TAK
+                if (ac.group && ac.group.startsWith('a-')) {
+                    feat.properties.type = ac.group;
+                }
             }
         }
 
