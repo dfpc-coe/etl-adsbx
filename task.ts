@@ -97,6 +97,10 @@ const Env = Type.Object({
         description: 'Mark flights in status "emergency" as "hostile". This allows them to appear in red on a TAK map.', 
         default: false 
     }),
+    'PUBSAFETY_ICONS_FOR_MILITARY': Type.Boolean({ 
+        description: 'Use public safety icons instead of general MIL-STD-2525 icons for military planes.', 
+        default: false 
+    }),
     'ADSBX_Ignore_Tower_Vehicles': Type.Boolean({
         description: 'Ignore tower vehicles (TWR) and ground vehicles (GND).',
         default: true
@@ -295,8 +299,12 @@ export default class Task extends ETL {
                 // This allows proper military symbology to be displayed in TAK
                 if (ac.group && ac.group.trim().startsWith('a-')) {
                     feat.properties.type = ac.group.trim();
+                    if (env.PUBSAFETY_ICONS_FOR_MILITARY) {
+                        feat.properties.icon = '66f14976-4b62-4023-8edb-d8d2ebeaa336/Public Safety Air/' + ac.group.trim() + '.png';
+                    } 
+                } else {
+                    feat.properties.icon = '66f14976-4b62-4023-8edb-d8d2ebeaa336/Public Safety Air/' + ac.group.trim() + '.png';
                 }
-                feat.properties.icon = '66f14976-4b62-4023-8edb-d8d2ebeaa336/Public Safety Air/' + ac.group.trim() + '.png';
             }
         }
 
