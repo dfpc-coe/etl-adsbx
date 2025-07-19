@@ -1,13 +1,36 @@
+/**
+ * ETL-ADSBX - Aircraft location data via ADS-B
+ * 
+ * This ETL task fetches aircraft location data from ADSBExchange and transforms it
+ * into Cursor-on-Target (CoT) format suitable for display on TAK maps, with special 
+ * handling for public safety aircraft.
+ */
+
 import { Static, Type, TSchema } from '@sinclair/typebox';
 import { fetch } from '@tak-ps/etl'
 import ETL, { Event, SchemaType, handler as internal, local, InvocationType, DataFlowType, InputFeatureCollection } from '@tak-ps/etl';
 
+/**
+ * UUID and path for the Public Safety Air icon set in TAK
+ * This is used to display specialized icons for different types of public safety aircraft
+ * See: https://tak.gov/public-safety-air-icons/
+ */
+const PUBLIC_SAFETY_AIR_ICON_PATH = '66f14976-4b62-4023-8edb-d8d2ebeaa336/Public Safety Air/';
+
+/**
+ * Environment configuration schema for the ETL task
+ * These parameters can be configured through the CloudTAK interface
+ */
 const Env = Type.Object({
-    'Query LatLon': Type.String({
+    'ADSBX_Emergency_Alert': Type.Boolean({
+        description: 'Use alert attribute to highlight aircraft in emergency status',
+        default: true
+    }),
+    'Query_LatLon': Type.String({
         description: 'Lat, Lon value to use for centering the API request',
         default: '40.14401,-119.81204'
     }),
-    'Query Dist': Type.String({
+    'Query_Dist': Type.String({
         description: 'Distance from the provided Lat, Lon location in nautical miles (NM) to provide results',
         default: "2650"
     }),
@@ -18,16 +41,16 @@ const Env = Type.Object({
         ],
         default: 'https://adsbexchange.com/api/aircraft'
     }),
-    'ADSBX_TOKEN': Type.String({ description: 'API Token for ADSBExchange' }),
-    'ADSBX_INCLUDES_FILTERING': Type.Boolean({
-        description: 'Only show aircraft from the ADSBX_INCLUDES list. This is useful for filtering out large amounts of aircraft in an area.',
+    'ADSBX_Token': Type.String({ description: 'API Token for ADSBExchange' }),
+    'ADSBX_Filtering': Type.Boolean({
+        description: 'Only show aircraft from the ADSBX_Includes list. This is useful for filtering out large amounts of aircraft in an area.',
         default: true
     }),
-    'ADSBX_INCLUDES_ICON': Type.Boolean({ 
-        description: 'Change aircraft icon based on the group provided in ADSBX_INCLUDES, even when filtering is disabled.',
+    'ADSBX_Use_Icon': Type.Boolean({ 
+        description: 'Change aircraft icon based on the group provided in ADSBX_Includes, even when filtering is disabled.',
         default: true
     }),
-    'ADSBX_INCLUDES': Type.Array(Type.Object({
+    'ADSBX_Includes': Type.Array(Type.Object({
         domain: Type.String({
             description: 'Public Safety domain of the Aircraft',
             enum: ['EMS', 'FIRE', 'LAW', 'FED', 'MIL'],
@@ -93,11 +116,8 @@ const Env = Type.Object({
             ]
         }),
     })),
-    'ADSBX_EMERGENCY_HOSTILE': Type.Boolean({ 
-        description: 'Mark flights in status "emergency" as "hostile". This allows them to appear in red on a TAK map.', 
-        default: false 
-    }),
-    'PUBSAFETY_ICONS_FOR_MILITARY': Type.Boolean({ 
+    // 'ADSBX_Emergency_Hostile' option has been replaced by 'ADSBX_Emergency_Alert'
+    'PubSafety_Icons_for_Military': Type.Boolean({ 
         description: 'Use public safety icons instead of general MIL-STD-2525 icons for military planes.', 
         default: false 
     }),
@@ -118,12 +138,16 @@ const Env = Type.Object({
         default: false })
 });
 
+/**
+ * Schema for aircraft data returned by the ADSBExchange API
+ * See API documentation: https://www.adsbexchange.com/version-2-api-wip/
+ */
 const ADSBResponse = Type.Object({
     hex: Type.String(),
     type: Type.String(),
     group: Type.Optional(Type.String({
         default: 'None',
-        description: 'Provided by the join with ADSBX_INCLUDES items'
+        description: 'Provided by the join with ADSBX_Includes items'
     })),
     flight: Type.Optional(Type.String()),
     r: Type.Optional(Type.String()),
@@ -147,6 +171,10 @@ const ADSBResponse = Type.Object({
     dst: Type.Optional(Type.Number()),
 })
 
+/**
+ * Main ETL task class for processing ADSBExchange data
+ * Fetches aircraft data, filters and transforms it, and submits it to CloudTAK
+ */
 export default class Task extends ETL {
     static name = 'etl-adsbx'
     static flow = [ DataFlowType.Incoming ];
@@ -167,29 +195,54 @@ export default class Task extends ETL {
         }
     }
 
+    /**
+     * Main control function that executes the ETL process
+     * 1. Fetches aircraft data from ADSBExchange API
+     * 2. Processes and transforms the data
+     * 3. Filters based on configuration
+     * 4. Submits the data to CloudTAK
+     */
     async control() {
         const env = await this.env(Env);
 
-        const api = `${env.ADSBX_API}/v2/lat/${env['Query LatLon'].split(',')[0].trim()}/lon/${env['Query LatLon'].split(',')[1].trim()}/dist/${env['Query Dist']}/`;
+        const api = `${env.ADSBX_API}/v2/lat/${env['Query_LatLon'].split(',')[0].trim()}/lon/${env['Query_LatLon'].split(',')[1].trim()}/dist/${env['Query_Dist']}/`;
 
         const url = new URL(api);
-        url.searchParams.append('apiKey', env.ADSBX_TOKEN);
+        url.searchParams.append('apiKey', env.ADSBX_Token);
         url.searchParams.append('cacheBuster', String(new Date().getTime()));
 
-        const res = await fetch(url, {
-            headers: {
-                'x-rapidapi-key': env.ADSBX_TOKEN,
-                'api-auth': env.ADSBX_TOKEN
+        // Fetch aircraft data from ADSBExchange with error handling
+        let body;
+        try {
+            const res = await fetch(url, {
+                headers: {
+                    'x-rapidapi-key': env.ADSBX_Token,
+                    'api-auth': env.ADSBX_Token
+                }
+            });
+            
+            if (!res.ok) {
+                throw new Error(`ADSBX API returned status ${res.status}: ${res.statusText}`);
             }
-        });
+            
+            body = await res.typed(Type.Object({
+                msg: Type.String(),
+                ac: Type.Array(ADSBResponse)
+            }));
+        } catch (error) {
+            console.error(`Error fetching ADSBX data: ${error.message}`);
+            // Return empty feature collection on error
+            await this.submit({
+                type: 'FeatureCollection',
+                features: []
+            });
+            return;
+        }
 
-        const body = await res.typed(Type.Object({
-            msg: Type.String(),
-            ac: Type.Array(ADSBResponse)
-        }));
-
+        // Map to store processed aircraft data by ID (registration or flight number)
         const ids = new Map();
 
+        // Process each aircraft from the API response
         for (const ac of body.ac) {
             if (!ac.flight && !ac.r) continue;
 
@@ -203,7 +256,7 @@ export default class Task extends ETL {
 
             if (!id.trim().length) continue;
 
-            // Determin the type of aircraft (fixed wing, rotorcraft, airship/balloon, etc.)
+            // Determine the type of aircraft (fixed wing, rotorcraft, airship/balloon, etc.)
             // https://www.adsbexchange.com/emitter-category-ads-b-do-260b-2-2-3-2-5-2/
             let ac_type = ''; // Unknown
             switch (ac.category) {
@@ -230,7 +283,7 @@ export default class Task extends ETL {
             // Based on the ICAO Hex code, which is a 6-character alphanumeric code assigned to each aircraft
             // https://www.aerotransport.org/html/ICAO_hex_decode.html
             let ac_affiliation = '-f'; // Friendly (Local)
-            if (ac.hex.toLowerCase().trim() >= env.ADSBX_ICAOHex_Domestic_Start.toLowerCase().trim() &&
+            if (ac.hex && ac.hex.toLowerCase().trim() >= env.ADSBX_ICAOHex_Domestic_Start.toLowerCase().trim() &&
                 ac.hex.toLowerCase().trim() <= env.ADSBX_ICAOHex_Domestic_End.toLowerCase().trim()) {
                 ac_affiliation = '-f'; // Friendly (Local civilian)
             } else {
@@ -242,7 +295,7 @@ export default class Task extends ETL {
             let ac_civmil = '-C'; // Civilian
             if (ac.dbFlags !== undefined && ac.dbFlags % 2 !== 0) {
                 ac_civmil = '-M'; // Military
-                if (ac.hex.toLowerCase().trim() >= env.ADSBX_ICAOHex_Domestic_Start.toLowerCase().trim() &&
+                if (ac.hex && ac.hex.toLowerCase().trim() >= env.ADSBX_ICAOHex_Domestic_Start.toLowerCase().trim() &&
                 ac.hex.toLowerCase().trim() <= env.ADSBX_ICAOHex_Domestic_End.toLowerCase().trim()) {
                     ac_affiliation = '-f'; // Friendly (Local Military)
                 } else {
@@ -250,40 +303,69 @@ export default class Task extends ETL {
                 }
             }
 
-            // Determine whether the aircraft is in emergency mode (show in red aka. "hostile") or not
+            // Determine whether the aircraft is in emergency mode
             // https://www.adsbexchange.com/version-2-api-wip/
-            if (ac.emergency !== undefined && ac.emergency !== 'none' && env.ADSBX_EMERGENCY_HOSTILE) {
-                ac_affiliation = '-h'; // Emergency
+            const isEmergency = ac.emergency !== undefined && ac.emergency !== 'none';
+
+            // Create a lookup map for registrations (for efficient matching)
+            // This avoids having to iterate through all includes for each aircraft
+            const includesMap = new Map();
+            for (const include of env.ADSBX_Includes) {
+                if (!include.registration) continue;
+                includesMap.set(include.registration.toLowerCase().trim(), include);
+            }
+            
+            // Check if this aircraft is in our includes list
+            const include = includesMap.get(id);
+            if (include) {
+                ac.group = include.group;
             }
 
-            for (const include of env.ADSBX_INCLUDES) {
-                const markup = include.registration.toLowerCase().trim();
-                if (id == markup) {
-                    ac.group = include.group;
-                }
+            // Define interface for feature properties with optional detail field
+            interface FeatureProperties {
+                type: string;
+                callsign: string;
+                time: Date;
+                start: Date;
+                speed: number;
+                course: number;
+                metadata: typeof ac;
+                remarks: string;
+                detail?: { alert: string };
+                icon?: string;
             }
-
+            
+            // Prepare the feature properties
+            const properties: FeatureProperties = {
+                type: 'a' + ac_affiliation + '-A' + ac_civmil + ac_type,
+                callsign: (ac.flight || '').trim(),
+                time: new Date(),
+                start: new Date(),
+                speed: (typeof ac.gs === 'number' ? ac.gs * 0.514444 : 0),
+                course: (typeof ac.track === 'number' ? ac.track : 9999999.0), // 9999999.0 is a special value indicating unknown course
+                metadata: ac,
+                remarks: [
+                    'Flight: ' + (ac.flight || 'Unknown').trim(),
+                    'Registration: ' + (ac.r || 'Unknown').trim(),
+                    'Type: ' + (ac.t || 'Unknown').trim(),
+                    'Category: ' + (ac.category || 'Unknown').trim(),
+                    'Emergency: ' + (ac.emergency || 'Unknown').trim(),
+                    'Squawk: ' + (ac.squawk || 'Unknown').trim(),
+                    'Group: ' + (ac.group || 'None').replace(/_/g,"-").trim(),  // CloudTAK formats "xx_yy_zz" as "xxyyzz" with yy being italics
+                ].join('\n')
+            };
+            
+            // Add alert attribute for emergency aircraft if configured
+            if (isEmergency && env.ADSBX_Emergency_Alert) {
+                properties.detail = {
+                    alert: "red" // Use red alert level for emergency aircraft
+                };
+            }
+            
             ids.set(id, {
                 id: id,
                 type: 'Feature',
-                properties: {
-                    type: 'a' + ac_affiliation + '-A' + ac_civmil + ac_type,
-                    callsign: (ac.flight || '').trim(),
-                    time: new Date(),
-                    start: new Date(),
-                    speed: ac.gs * 0.514444 || 0,
-                    course: ac.track || 9999999.0,
-                    metadata: ac,
-                    remarks: [
-                        'Flight: ' + (ac.flight || 'Unknown').trim(),
-                        'Registration: ' + (ac.r || 'Unknown').trim(),
-                        'Type: ' + (ac.t || 'Unknown').trim(),
-                        'Category: ' + (ac.category || 'Unknown').trim(),
-                        'Emergency: ' + (ac.emergency || 'Unknown').trim(),
-                        'Squawk: ' + (ac.squawk || 'Unknown').trim(),
-                        'Group: ' + (ac.group || 'None').replace(/_/g,"-").trim(),  // CloudTAK formats "xx_yy_zz" as "xxyyzz" with yy being italics
-                    ].join('\n')
-                },
+                properties: properties,
                 geometry: {
                     type: 'Point',
                     coordinates
@@ -294,35 +376,43 @@ export default class Task extends ETL {
             // https://tak.gov/public-safety-air-icons/
             // This is used to display different icons for different types of public safety aircraft    
             const feat = ids.get(id);
-            if (ac.group && ac.group.trim() !== 'UNKNOWN' && ac.group.trim() !== 'None' && env.ADSBX_INCLUDES_ICON) {
+            if (ac.group && ac.group.trim() !== 'UNKNOWN' && ac.group.trim() !== 'None' && env.ADSBX_Use_Icon) {
                 // If the group starts with 'a-', it's a military symbol code (e.g., a-f-A-M-F-R), so use it directly as the type
                 // This allows proper military symbology to be displayed in TAK
                 if (ac.group && ac.group.trim().startsWith('a-')) {
                     feat.properties.type = ac.group.trim();
-                    if (env.PUBSAFETY_ICONS_FOR_MILITARY) {
-                        feat.properties.icon = '66f14976-4b62-4023-8edb-d8d2ebeaa336/Public Safety Air/' + ac.group.trim() + '.png';
+                    if (env.PubSafety_Icons_for_Military) {
+                        feat.properties.icon = PUBLIC_SAFETY_AIR_ICON_PATH + ac.group.trim() + '.png';
                     } 
                 } else {
-                    feat.properties.icon = '66f14976-4b62-4023-8edb-d8d2ebeaa336/Public Safety Air/' + ac.group.trim() + '.png';
+                    feat.properties.icon = PUBLIC_SAFETY_AIR_ICON_PATH + ac.group.trim() + '.png';
                 }
             }
         }
 
+        // Prepare arrays and sets for the final feature collection
         const features = [];
-        const features_ids = new Set();
+        const features_ids = new Set(); // Track IDs to avoid duplicates
 
-        if (env.ADSBX_INCLUDES_FILTERING) {
-            for (const include of env.ADSBX_INCLUDES) {
-                const id = include.registration.toLowerCase().trim();
-
+        // Apply filtering based on configuration
+        if (env.ADSBX_Filtering) {
+            // Reuse the same lookup map pattern for filtering
+            const includesMap = new Map();
+            for (const include of env.ADSBX_Includes) {
+                if (!include.registration) continue;
+                includesMap.set(include.registration.toLowerCase().trim(), include);
+            }
+            
+            // Process only aircraft that are in our includes list
+            for (const [id, include] of includesMap.entries()) {
                 if (ids.has(id)) {
                     const feat = ids.get(id);
 
-                    if (include.callsign) {
+                    if (include && include.callsign) {
                         feat.properties.callsign = include.callsign;
                     }
 
-                    if (include.group) {
+                    if (include && include.group) {
                         feat.properties.metadata.group = include.group;
                     }
 
@@ -333,6 +423,7 @@ export default class Task extends ETL {
                 }
             }
         } else {
+            // When filtering is disabled, include all aircraft
             for (const feat of ids.values()) {
 
                 if (!features_ids.has(feat.id)) {
@@ -343,6 +434,8 @@ export default class Task extends ETL {
         }
 
         console.log(`ok - fetched ${ids.size} aircraft`);
+        
+        // Create the final GeoJSON feature collection to submit
         const fc: Static<typeof InputFeatureCollection> = {
             type: 'FeatureCollection',
             features
@@ -352,7 +445,10 @@ export default class Task extends ETL {
     }
 }
 
+// For local development testing
 await local(new Task(import.meta.url), import.meta.url);
+
+// AWS Lambda handler function
 export async function handler(event: Event = {}) {
     return await internal(new Task(import.meta.url), event);
 }
