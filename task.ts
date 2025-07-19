@@ -22,17 +22,13 @@ const PUBLIC_SAFETY_AIR_ICON_PATH = '66f14976-4b62-4023-8edb-d8d2ebeaa336/Public
  * These parameters can be configured through the CloudTAK interface
  */
 const Env = Type.Object({
-    'ADSBX_Emergency_Alert': Type.Boolean({
-        description: 'Use alert attribute to highlight aircraft in emergency status',
-        default: true
-    }),
     'Query_LatLon': Type.String({
         description: 'Lat, Lon value to use for centering the API request',
-        default: '40.14401,-119.81204'
+        default: '-41.29,174.78'
     }),
     'Query_Dist': Type.String({
         description: 'Distance from the provided Lat, Lon location in nautical miles (NM) to provide results',
-        default: "2650"
+        default: "750"
     }),
     'ADSBX_API': Type.String({
         enum: [
@@ -44,7 +40,7 @@ const Env = Type.Object({
     'ADSBX_Token': Type.String({ description: 'API Token for ADSBExchange' }),
     'ADSBX_Filtering': Type.Boolean({
         description: 'Only show aircraft from the ADSBX_Includes list. This is useful for filtering out large amounts of aircraft in an area.',
-        default: true
+        default: false
     }),
     'ADSBX_Use_Icon': Type.Boolean({ 
         description: 'Change aircraft icon based on the group provided in ADSBX_Includes, even when filtering is disabled.',
@@ -116,7 +112,10 @@ const Env = Type.Object({
             ]
         }),
     })),
-    // 'ADSBX_Emergency_Hostile' option has been replaced by 'ADSBX_Emergency_Alert'
+    'ADSBX_Emergency_Alert': Type.Boolean({
+        description: 'Use alert attribute to highlight aircraft in emergency status',
+        default: true
+    }),
     'PubSafety_Icons_for_Military': Type.Boolean({ 
         description: 'Use public safety icons instead of general MIL-STD-2525 icons for military planes.', 
         default: false 
@@ -126,11 +125,11 @@ const Env = Type.Object({
         default: true
     }),
     'ADSBX_ICAOHex_Domestic_Start': Type.String({ 
-        description: 'ICAO HEX start value for domestic flights. E.g. A00000 for USA.', 
-        default: 'A00000'
+        description: 'ICAO HEX start value for domestic flights. E.g. A00000 for USA or C80000 for NZ.', 
+        default: 'C80000'
     }),
     'ADSBX_ICAOHex_Domestic_End': Type.String({ 
-        description: 'ICAO HEX start value for domestic flights. E.g. AFFFFF for USA.', 
+        description: 'ICAO HEX start value for domestic flights. E.g. AFFFFF for USA or C87FFF for NZ.', 
         default: 'AFFFFF'
     }),
     'DEBUG': Type.Boolean({ 
