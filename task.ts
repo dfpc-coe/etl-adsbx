@@ -358,8 +358,8 @@ export default class Task extends ETL {
                     'Category: ' + (ac.category || 'Unknown').trim(),
                     'Emergency: ' + (ac.emergency || 'Unknown').trim(),
                     'Squawk: ' + (ac.squawk || 'Unknown').trim(),
-                    'Group: ' + (ac.group || 'None').replace(/_/g,"-").trim(),  // CloudTAK formats "xx_yy_zz" as "xxyyzz" with yy being italics
-                    'Comments: ' + (ac.comments || '').trim()
+                    ...(ac.group && ac.group !== 'None' && ac.group !== 'UNKNOWN' ? ['Group: ' + ac.group.replace(/_/g,"-").trim()] : []),  // CloudTAK formats "xx_yy_zz" as "xxyyzz" with yy being italics
+                    ...(ac.comments ? ['Comments: ' + ac.comments.trim()] : [])
                 ].join('\n')
             };
             
@@ -422,15 +422,52 @@ export default class Task extends ETL {
 
                     if (include && include.group) {
                         feat.properties.metadata.group = include.group;
+                        
+                        // Update remarks to include the new group
+                        if (include.group !== 'None' && include.group !== 'UNKNOWN') {
+                            // If remarks already has a Group line, replace it
+                            if (feat.properties.remarks.includes('Group:')) {
+                                feat.properties.remarks = feat.properties.remarks.replace(
+                                    /Group: .*$/m, 
+                                    'Group: ' + include.group.replace(/_/g,"-").trim()
+                                );
+                            } else {
+                                // Otherwise add the Group line before Comments if it exists
+                                if (feat.properties.remarks.includes('Comments:')) {
+                                    feat.properties.remarks = feat.properties.remarks.replace(
+                                        /(Comments:.*)$/m,
+                                        'Group: ' + include.group.replace(/_/g,"-").trim() + '\n$1'
+                                    );
+                                } else {
+                                    // Add at the end if no Comments line
+                                    feat.properties.remarks += '\nGroup: ' + include.group.replace(/_/g,"-").trim();
+                                }
+                            }
+                        } else {
+                            // If group is None/UNKNOWN, remove any existing Group line
+                            feat.properties.remarks = feat.properties.remarks.replace(/\nGroup: .*$/m, '');
+                        }
                     }
 
                     if (include && include.comments !== undefined) {
                         feat.properties.metadata.comments = include.comments;
+                        
                         // Update remarks to include the new comments
-                        feat.properties.remarks = feat.properties.remarks.replace(
-                            /Comments: .*$/m, 
-                            'Comments: ' + include.comments.trim()
-                        );
+                        if (include.comments) {
+                            // If remarks already has a Comments line, replace it
+                            if (feat.properties.remarks.includes('Comments:')) {
+                                feat.properties.remarks = feat.properties.remarks.replace(
+                                    /Comments: .*$/m, 
+                                    'Comments: ' + include.comments.trim()
+                                );
+                            } else {
+                                // Otherwise add the Comments line
+                                feat.properties.remarks += '\nComments: ' + include.comments.trim();
+                            }
+                        } else {
+                            // If comments is empty/null, remove any existing Comments line
+                            feat.properties.remarks = feat.properties.remarks.replace(/\nComments: .*$/m, '');
+                        }
                     }
 
                     if (!features_ids.has(id)) {
