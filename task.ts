@@ -111,6 +111,7 @@ const Env = Type.Object({
                 'MIL_ROTOR_ISR_RESCUE'
             ]
         }),
+        comments: Type.Optional(Type.String({ description: 'Additional comments.' })),
     })),
     'ADSBX_Emergency_Alert': Type.Boolean({
         description: 'Use alert attribute to highlight aircraft in emergency status',
@@ -146,6 +147,10 @@ const ADSBResponse = Type.Object({
     type: Type.String(),
     group: Type.Optional(Type.String({
         default: 'None',
+        description: 'Provided by the join with ADSBX_Includes items'
+    })),
+    comments: Type.Optional(Type.String({
+        default: '',
         description: 'Provided by the join with ADSBX_Includes items'
     })),
     flight: Type.Optional(Type.String()),
@@ -318,6 +323,9 @@ export default class Task extends ETL {
             const include = includesMap.get(id);
             if (include) {
                 ac.group = include.group;
+                if (include.comments !== undefined) {
+                    ac.comments = include.comments;
+                }
             }
 
             // Define interface for feature properties with optional detail field
@@ -351,6 +359,7 @@ export default class Task extends ETL {
                     'Emergency: ' + (ac.emergency || 'Unknown').trim(),
                     'Squawk: ' + (ac.squawk || 'Unknown').trim(),
                     'Group: ' + (ac.group || 'None').replace(/_/g,"-").trim(),  // CloudTAK formats "xx_yy_zz" as "xxyyzz" with yy being italics
+                    'Comments: ' + (ac.comments || '').trim()
                 ].join('\n')
             };
             
@@ -413,6 +422,15 @@ export default class Task extends ETL {
 
                     if (include && include.group) {
                         feat.properties.metadata.group = include.group;
+                    }
+
+                    if (include && include.comments !== undefined) {
+                        feat.properties.metadata.comments = include.comments;
+                        // Update remarks to include the new comments
+                        feat.properties.remarks = feat.properties.remarks.replace(
+                            /Comments: .*$/m, 
+                            'Comments: ' + include.comments.trim()
+                        );
                     }
 
                     if (!features_ids.has(id)) {
