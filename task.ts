@@ -11,11 +11,81 @@ import { fetch } from '@tak-ps/etl'
 import ETL, { Event, SchemaType, handler as internal, local, InvocationType, DataFlowType, InputFeatureCollection } from '@tak-ps/etl';
 
 /**
+ * Constants used throughout the ETL task
+ */
+// Special value indicating unknown course in CoT format
+const UNKNOWN_COURSE = Number.NaN; // Using NaN per CoT specification for unknown values
+
+// Conversion factor from knots to meters per second (1 knot = 0.51444... m/s)
+const KNOTS_TO_MPS = 0.5144444;
+
+// Conversion factor from feet to meters
+const FEET_TO_METERS = 0.3048;
+
+/**
  * UUID and path for the Public Safety Air icon set in TAK
  * This is used to display specialized icons for different types of public safety aircraft
  * See: https://tak.gov/public-safety-air-icons/
  */
 const PUBLIC_SAFETY_AIR_ICON_PATH = '66f14976-4b62-4023-8edb-d8d2ebeaa336/Public Safety Air/';
+
+/**
+ * Set of valid icon groups that can be used with the Public Safety Air icon set
+ * This is used to validate icon paths before setting them
+ */
+const VALID_ICON_GROUPS = new Set([
+    'a-f-A-M-F-A',
+    'a-f-A-M-F-C',
+    'a-f-A-M-F-J',
+    'a-f-A-M-F-O',
+    'a-f-A-M-F-Q',
+    'a-f-A-M-F-R-Z',
+    'a-f-A-M-F-R',
+    'a-f-A-M-F-U',
+    'a-f-A-M-F-V',
+    'a-f-A-M-F-WX',
+    'a-f-A-M-F-Y',
+    'a-f-A-M-H-H',
+    'a-f-A-M-H-R',
+    'a-f-A-M-H-V',
+    'a-f-A-M-H',
+    'a-n-A-M-F-V',
+    'CIV_FIXED_CAP',
+    'CIV_FIXED_ISR',
+    'CIV_LTA_AIRSHIP',
+    'CIV_LTA_BALLOON',
+    'CIV_LTA_TETHERED',
+    'CIV_ROTOR_ISR',
+    'CIV_UAS',
+    'CIV_UAS_ROTOR',
+    'EMS_FIXED_WING',
+    'EMS_ROTOR',
+    'EMS_ROTOR_RESCUE',
+    'FIRE_AIR_ATTACK',
+    'FIRE_AIR_TANKER',
+    'FIRE_INTEL',
+    'FIRE_LEAD_PLANE',
+    'FIRE_MULTI_USE',
+    'FIRE_ROTOR',
+    'FIRE_ROTOR_AIR_ATTACK',
+    'FIRE_ROTOR_INTEL',
+    'FIRE_ROTOR_RESCUE',
+    'FIRE_SEAT',
+    'FIRE_SMOKE_JMPR',
+    'FIRE_UAS',
+    'LE_FIXED_WING',
+    'LE_FIXED_WING_ISR',
+    'LE_ROTOR',
+    'LE_ROTOR_RESCUE',
+    'LE_UAS',
+    'FED_FIXED_WING',
+    'FED_FIXED_WING_ISR',
+    'FED_ROTOR',
+    'FED_ROTOR_RESCUE',
+    'FED_UAS',
+    'MIL_ROTOR_MED_RESCUE',
+    'MIL_ROTOR_ISR_RESCUE'
+]);
 
 /**
  * Environment configuration schema for the ETL task
@@ -51,7 +121,7 @@ const Env = Type.Object({
             description: 'Public Safety domain of the Aircraft',
             enum: ['EMS', 'FIRE', 'LAW', 'FED', 'MIL'],
         }),
-        callsign: Type.Optional(Type.String({ description: 'Callsign of the Aircraft.' })),
+        ICAO_hex: Type.Optional(Type.String({ description: 'ICAO hex code of the Aircraft.' })),
         registration: Type.Optional(Type.String({ description: 'Registration Number of the Aircraft.' })),
         group: Type.String({
             description: 'Category of Aircraft. This is used to determine the icon to use for the aircraft.',
@@ -111,15 +181,12 @@ const Env = Type.Object({
                 'MIL_ROTOR_ISR_RESCUE'
             ]
         }),
+        type: Type.Optional(Type.String({ description: 'Custom CoT type. E.g. a-f-A-M-F-C-H' })),
         comments: Type.Optional(Type.String({ description: 'Additional comments.' })),
     })),
     'ADSBX_Emergency_Alert': Type.Boolean({
         description: 'Use alert attribute to highlight aircraft in emergency status',
         default: true
-    }),
-    'PubSafety_Icons_for_Military': Type.Boolean({ 
-        description: 'Use public safety icons instead of general MIL-STD-2525 icons for military planes.', 
-        default: false 
     }),
     'ADSBX_Ignore_Tower_Vehicles': Type.Boolean({
         description: 'Ignore tower vehicles (TWR) and ground vehicles (GND).',
@@ -141,11 +208,105 @@ const Env = Type.Object({
 /**
  * Schema for aircraft data returned by the ADSBExchange API
  * See API documentation: https://www.adsbexchange.com/version-2-api-wip/
+ * 
+ * This schema has been enhanced to properly validate all fields used in the code
+ * to prevent potential runtime errors.
  */
 const ADSBResponse = Type.Object({
-    hex: Type.String(),
-    type: Type.String(),
+    // Required fields
+    hex: Type.String({
+        description: 'ICAO 24-bit address (Mode S transponder code) in hex string format'
+    }),
+    type: Type.String({
+        description: 'Type of ADS-B data source'
+    }),
+    lat: Type.Number({
+        description: 'Latitude in decimal degrees'
+    }),
+    lon: Type.Number({
+        description: 'Longitude in decimal degrees'
+    }),
+    seen_pos: Type.Number({
+        description: 'How long ago (in seconds) the position was last reported'
+    }),
+    seen: Type.Number({
+        description: 'How long ago (in seconds) a message was last received from this aircraft'
+    }),
+    
+    // Optional fields with defaults or validation
+    flight: Type.Optional(Type.String({
+        description: 'Flight or callsign',
+        default: ''
+    })),
+    r: Type.Optional(Type.String({
+        description: 'Registration (tail number)',
+        default: ''
+    })),
+    t: Type.Optional(Type.String({
+        description: 'Aircraft type',
+        default: ''
+    })),
+    dbFlags: Type.Optional(Type.Number({
+        description: 'Database flags, bit 0 = military'
+    })),
+    alt_baro: Type.Optional(Type.Union([
+        Type.Number({
+            description: 'Barometric altitude in feet'
+        }),
+        Type.String({
+            description: 'Barometric altitude as string (e.g. "ground")'
+        })
+    ])),
+    alt_geom: Type.Optional(Type.Union([
+        Type.Number({
+            description: 'Geometric altitude in feet'
+        }),
+        Type.String({
+            description: 'Geometric altitude as string'
+        })
+    ])),
+    gs: Type.Optional(Type.Number({
+        description: 'Ground speed in knots'
+        // No default - will use NaN for unknown values
+    })),
+    track: Type.Optional(Type.Number({
+        description: 'Track angle in degrees (0-359)',
+        default: UNKNOWN_COURSE
+    })),
+    baro_rate: Type.Optional(Type.Number({
+        description: 'Rate of climb/descent in feet per minute'
+    })),
+    squawk: Type.Optional(Type.String({
+        description: 'Transponder code (octal)',
+        default: ''
+    })),
+    emergency: Type.Optional(Type.String({
+        description: 'Emergency status',
+        default: 'none'
+    })),
+    category: Type.Optional(Type.String({
+        description: 'Aircraft category (A0-A7, B0-B7, C0-C7, D0-D7)',
+        default: ''
+    })),
+    nav_qnh: Type.Optional(Type.Number({
+        description: 'Altimeter setting (QNH/QFE) in millibars'
+    })),
+    nav_altitude_mcp: Type.Optional(Type.Number({
+        description: 'MCP/FCU selected altitude in feet'
+    })),
+    nav_heading: Type.Optional(Type.Number({
+        description: 'Selected heading in degrees'
+    })),
+    dst: Type.Optional(Type.Number({
+        description: 'Distance from receiver in nautical miles'
+    })),
+    
+    // Fields added by our ETL process
     group: Type.Optional(Type.String({
+        default: 'None',
+        description: 'Provided by the join with ADSBX_Includes items'
+    })),
+    cot_type: Type.Optional(Type.String({
         default: 'None',
         description: 'Provided by the join with ADSBX_Includes items'
     })),
@@ -153,26 +314,6 @@ const ADSBResponse = Type.Object({
         default: '',
         description: 'Provided by the join with ADSBX_Includes items'
     })),
-    flight: Type.Optional(Type.String()),
-    r: Type.Optional(Type.String()),
-    t: Type.Optional(Type.String()),
-    dbFlags: Type.Optional(Type.Number()),
-    alt_baro: Type.Optional(Type.Union([Type.Number(), Type.String()])),
-    alt_geom: Type.Optional(Type.Number()),
-    gs: Type.Optional(Type.Number()),
-    track: Type.Optional(Type.Number()),
-    baro_rate: Type.Optional(Type.Number()),
-    squawk: Type.Optional(Type.String()),
-    emergency: Type.Optional(Type.String()),
-    category: Type.Optional(Type.String()),
-    nav_qnh: Type.Optional(Type.Number()),
-    nav_altitude_mcp: Type.Optional(Type.Number()),
-    nav_heading: Type.Optional(Type.Number()),
-    lat: Type.Number(),
-    lon: Type.Number(),
-    seen_pos: Type.Number(),
-    seen: Type.Number(),
-    dst: Type.Optional(Type.Number()),
 })
 
 /**
@@ -243,6 +384,22 @@ export default class Task extends ETL {
             return;
         }
 
+        // Create lookup maps for registrations and ICAO hex codes (for efficient matching)
+        // These maps are used both for updating aircraft details and for filtering
+        // Creating them once here avoids duplicating the code and improves performance
+        const includesMap = new Map();
+        const hexMap = new Map();
+        for (const include of env.ADSBX_Includes) {
+            // Add to registration map
+            if (include.registration) {
+                includesMap.set(include.registration.toLowerCase().trim(), include);
+            }
+            // Add to ICAO hex map
+            if (include.ICAO_hex) {
+                hexMap.set(include.ICAO_hex.toLowerCase().trim(), include);
+            }
+        }
+
         // Map to store processed aircraft data by ID (registration or flight number)
         const ids = new Map();
 
@@ -255,8 +412,19 @@ export default class Task extends ETL {
             const id = (ac.r || ac.flight).toLowerCase().trim();
             const coordinates = [ac.lon, ac.lat];
 
-            // If alt. is present convert to meters
-            if (ac.alt_geom) coordinates.push(ac.alt_geom * 0.3048);
+            // Handle altitude conversion from feet to meters with proper type checking
+            if (ac.alt_geom !== undefined && ac.alt_geom !== null) {
+                // Convert to number if it's a string, or use the number directly
+                const altitudeValue = typeof ac.alt_geom === 'string' ? parseFloat(ac.alt_geom) : ac.alt_geom;
+                
+                // Only add valid numeric altitudes (including negative values for below sea level)
+                if (!isNaN(altitudeValue)) {
+                    coordinates.push(altitudeValue * FEET_TO_METERS);
+                }
+            } else {
+                // Add NaN for unknown altitude per CoT specification
+                coordinates.push(Number.NaN);
+            }
 
             if (!id.trim().length) continue;
 
@@ -283,12 +451,35 @@ export default class Task extends ETL {
                     break;
             }
 
+            // Helper function to safely compare ICAO hex codes
+            // Converts hex strings to integers for proper numerical comparison
+            function isHexInRange(hex: string, startHex: string, endHex: string): boolean {
+                if (!hex) return false;
+                
+                // Normalize hex strings: remove whitespace, convert to uppercase, ensure 6 characters
+                const normalizeHex = (h: string) => {
+                    h = h.trim().toUpperCase();
+                    // Pad with leading zeros if shorter than 6 characters
+                    return h.padStart(6, '0');
+                };
+                
+                const hexNorm = normalizeHex(hex);
+                const startNorm = normalizeHex(startHex);
+                const endNorm = normalizeHex(endHex);
+                
+                // Convert hex strings to integers for numerical comparison
+                const hexVal = parseInt(hexNorm, 16);
+                const startVal = parseInt(startNorm, 16);
+                const endVal = parseInt(endNorm, 16);
+                
+                return hexVal >= startVal && hexVal <= endVal;
+            }
+            
             // Determine whether the aircraft is a domestic or foreign flight
             // Based on the ICAO Hex code, which is a 6-character alphanumeric code assigned to each aircraft
             // https://www.aerotransport.org/html/ICAO_hex_decode.html
-            let ac_affiliation = '-f'; // Friendly (Local)
-            if (ac.hex && ac.hex.toLowerCase().trim() >= env.ADSBX_ICAOHex_Domestic_Start.toLowerCase().trim() &&
-                ac.hex.toLowerCase().trim() <= env.ADSBX_ICAOHex_Domestic_End.toLowerCase().trim()) {
+            let ac_affiliation;
+            if (ac.hex && isHexInRange(ac.hex, env.ADSBX_ICAOHex_Domestic_Start, env.ADSBX_ICAOHex_Domestic_End)) {
                 ac_affiliation = '-f'; // Friendly (Local civilian)
             } else {
                 ac_affiliation = '-n'; // Neutral (Foreign civilian)
@@ -299,8 +490,7 @@ export default class Task extends ETL {
             let ac_civmil = '-C'; // Civilian
             if (ac.dbFlags !== undefined && ac.dbFlags % 2 !== 0) {
                 ac_civmil = '-M'; // Military
-                if (ac.hex && ac.hex.toLowerCase().trim() >= env.ADSBX_ICAOHex_Domestic_Start.toLowerCase().trim() &&
-                ac.hex.toLowerCase().trim() <= env.ADSBX_ICAOHex_Domestic_End.toLowerCase().trim()) {
+                if (ac.hex && isHexInRange(ac.hex, env.ADSBX_ICAOHex_Domestic_Start, env.ADSBX_ICAOHex_Domestic_End)) {
                     ac_affiliation = '-f'; // Friendly (Local Military)
                 } else {
                     ac_affiliation = '-u'; // Unknown (Foreign Military)
@@ -310,19 +500,27 @@ export default class Task extends ETL {
             // Determine whether the aircraft is in emergency mode
             // https://www.adsbexchange.com/version-2-api-wip/
             const isEmergency = ac.emergency !== undefined && ac.emergency !== 'none';
-
-            // Create a lookup map for registrations (for efficient matching)
-            // This avoids having to iterate through all includes for each aircraft
-            const includesMap = new Map();
-            for (const include of env.ADSBX_Includes) {
-                if (!include.registration) continue;
-                includesMap.set(include.registration.toLowerCase().trim(), include);
+            
+            // Check if this aircraft is in our includes list by ICAO hex first, then registration
+            let include;
+            
+            // First try to find by ICAO hex
+            if (ac.hex) {
+                include = hexMap.get(ac.hex.toLowerCase().trim());
             }
             
-            // Check if this aircraft is in our includes list
-            const include = includesMap.get(id);
+            // If not found by ICAO hex, try to find by registration
+            if (!include) {
+                include = includesMap.get(id);
+            }
+            
             if (include) {
-                ac.group = include.group;
+                if (include.group !== undefined) {
+                    ac.group = include.group;
+                }
+                if (include.cot_type !== undefined) {
+                    ac.cot_type = include.cot_type;
+                }
                 if (include.comments !== undefined) {
                     ac.comments = include.comments;
                 }
@@ -342,25 +540,59 @@ export default class Task extends ETL {
                 icon?: string;
             }
             
+            // Helper function to build structured remarks
+            function buildRemarks(aircraft: Static<typeof ADSBResponse>): string {
+                const remarksObj: Record<string, string> = {
+                    'Flight': (aircraft.flight || 'Unknown').trim(),
+                    'Registration': (aircraft.r || 'Unknown').trim(),
+                    'Type': (aircraft.t || 'Unknown').trim(),
+                    'Category': (aircraft.category || 'Unknown').trim(),
+                    'Emergency': (aircraft.emergency || 'Unknown').trim(),
+                    'Squawk': (aircraft.squawk || 'Unknown').trim()
+                };
+                
+                // Add altitude information
+                if (aircraft.alt_baro !== undefined) {
+                    remarksObj['Alt Baro'] = typeof aircraft.alt_baro === 'number' ? 
+                        `${aircraft.alt_baro} ft` : aircraft.alt_baro.toString();
+                }
+                
+                if (aircraft.alt_geom !== undefined) {
+                    remarksObj['Alt Geom'] = typeof aircraft.alt_geom === 'number' ? 
+                        `${aircraft.alt_geom} ft` : aircraft.alt_geom.toString();
+                }
+                
+                // Add optional fields if present
+                if (aircraft.group && aircraft.group.trim() !== 'None' && aircraft.group.trim() !== 'UNKNOWN') {
+                    remarksObj['Group'] = aircraft.group.replace(/_/g, '-').trim();
+                }
+                
+                if (aircraft.comments) {
+                    remarksObj['Comments'] = aircraft.comments.trim();
+                }
+                
+                // Build remarks string with a specific order
+                const orderedKeys = [
+                    'Flight', 'Registration', 'Type', 'Category', 
+                    'Alt Baro', 'Alt Geom', 'Emergency', 'Squawk', 'Group', 'Comments'
+                ];
+                
+                return orderedKeys
+                    .filter(key => key in remarksObj)
+                    .map(key => `${key}: ${remarksObj[key]}`)
+                    .join('\n');
+            }
+            
             // Prepare the feature properties
             const properties: FeatureProperties = {
                 type: 'a' + ac_affiliation + '-A' + ac_civmil + ac_type,
                 callsign: (ac.flight || '').trim(),
-                time: new Date(),
-                start: new Date(),
-                speed: (typeof ac.gs === 'number' ? ac.gs * 0.514444 : 0),
-                course: (typeof ac.track === 'number' ? ac.track : 9999999.0), // 9999999.0 is a special value indicating unknown course
+                time: new Date(Date.now() - (ac.seen_pos * 1000)),
+                start: new Date(Date.now() - (ac.seen_pos * 1000)),
+                speed: (typeof ac.gs === 'number' ? ac.gs * KNOTS_TO_MPS : Number.NaN), // Use NaN for unknown speed per CoT spec
+                course: (typeof ac.track === 'number' ? ac.track : UNKNOWN_COURSE), // Use NaN for unknown course per CoT spec
                 metadata: ac,
-                remarks: [
-                    'Flight: ' + (ac.flight || 'Unknown').trim(),
-                    'Registration: ' + (ac.r || 'Unknown').trim(),
-                    'Type: ' + (ac.t || 'Unknown').trim(),
-                    'Category: ' + (ac.category || 'Unknown').trim(),
-                    'Emergency: ' + (ac.emergency || 'Unknown').trim(),
-                    'Squawk: ' + (ac.squawk || 'Unknown').trim(),
-                    ...(ac.group && ac.group !== 'None' && ac.group !== 'UNKNOWN' ? ['Group: ' + ac.group.replace(/_/g,"-").trim()] : []),  // CloudTAK formats "xx_yy_zz" as "xxyyzz" with yy being italics
-                    ...(ac.comments ? ['Comments: ' + ac.comments.trim()] : [])
-                ].join('\n')
+                remarks: buildRemarks(ac)
             };
             
             // Add alert attribute for emergency aircraft if configured
@@ -385,105 +617,186 @@ export default class Task extends ETL {
             // This is used to display different icons for different types of public safety aircraft    
             const feat = ids.get(id);
             if (ac.group && ac.group.trim() !== 'UNKNOWN' && ac.group.trim() !== 'None' && env.ADSBX_Use_Icon) {
-                // If the group starts with 'a-', it's a military symbol code (e.g., a-f-A-M-F-R), so use it directly as the type
-                // This allows proper military symbology to be displayed in TAK
-                if (ac.group && ac.group.trim().startsWith('a-')) {
-                    feat.properties.type = ac.group.trim();
-                    if (env.PubSafety_Icons_for_Military) {
-                        feat.properties.icon = PUBLIC_SAFETY_AIR_ICON_PATH + ac.group.trim() + '.png';
-                    } 
+                const groupName = ac.group.trim();
+                // Validate that the group is in our list of valid icon groups before setting the icon
+                if (VALID_ICON_GROUPS.has(groupName)) {
+                    feat.properties.icon = PUBLIC_SAFETY_AIR_ICON_PATH + groupName + '.png';
                 } else {
-                    feat.properties.icon = PUBLIC_SAFETY_AIR_ICON_PATH + ac.group.trim() + '.png';
+                    // Log a warning if an invalid group is encountered
+                    console.warn(`Warning: Invalid icon group '${groupName}' for aircraft ${id}. Using default icon.`);
                 }
+            }
+
+            // If the aircraft has a custom CoT type defined, use it
+            if (ac.cot_type && ac.cot_type.trim() !== 'None' && ac.cot_type.trim() !== 'UNKNOWN') {
+                feat.properties.type = ac.cot_type.trim();
             }
         }
 
-        // Prepare arrays and sets for the final feature collection
+        // Prepare array for the final feature collection
         const features = [];
-        const features_ids = new Set(); // Track IDs to avoid duplicates
+        
+        // Helper function to parse and rebuild remarks in a structured way
+        function updateRemarks(remarks: string, updates: Record<string, string | null>): string {
+            // Parse existing remarks into a structured object
+            const lines = remarks.split('\n');
+            const remarksObj: Record<string, string> = {};
+            
+            // Extract existing key-value pairs
+            for (const line of lines) {
+                const colonIndex = line.indexOf(':');
+                if (colonIndex > 0) {
+                    const key = line.substring(0, colonIndex).trim();
+                    const value = line.substring(colonIndex + 1).trim();
+                    remarksObj[key] = value;
+                }
+            }
+            
+            // Apply updates
+            for (const [key, value] of Object.entries(updates)) {
+                if (value === null) {
+                    // Remove the field if value is null
+                    delete remarksObj[key];
+                } else {
+                    // Update or add the field
+                    remarksObj[key] = value;
+                }
+            }
+            
+            // Rebuild remarks string with a specific order
+            const orderedKeys = [
+                'Flight', 'Registration', 'Type', 'Category', 
+                'Alt Baro', 'Alt Geom', 'Emergency', 'Squawk', 'Group', 'Comments'
+            ];
+            
+            // Start with ordered keys
+            const result = orderedKeys
+                .filter(key => key in remarksObj)
+                .map(key => `${key}: ${remarksObj[key]}`);
+            
+            // Add any remaining keys not in the ordered list
+            for (const [key, value] of Object.entries(remarksObj)) {
+                if (!orderedKeys.includes(key)) {
+                    result.push(`${key}: ${value}`);
+                }
+            }
+            
+            return result.join('\n');
+        }
 
         // Apply filtering based on configuration
         if (env.ADSBX_Filtering) {
-            // Reuse the same lookup map pattern for filtering
-            const includesMap = new Map();
-            for (const include of env.ADSBX_Includes) {
-                if (!include.registration) continue;
-                includesMap.set(include.registration.toLowerCase().trim(), include);
-            }
+            // Create a set to track processed aircraft IDs
+            const processedIds = new Set();
             
-            // Process only aircraft that are in our includes list
-            for (const [id, include] of includesMap.entries()) {
-                if (ids.has(id)) {
-                    const feat = ids.get(id);
-
-                    if (include && include.callsign) {
-                        feat.properties.callsign = include.callsign;
-                    }
-
-                    if (include && include.group) {
-                        feat.properties.metadata.group = include.group;
-                        
-                        // Update remarks to include the new group
-                        if (include.group !== 'None' && include.group !== 'UNKNOWN') {
-                            // If remarks already has a Group line, replace it
-                            if (feat.properties.remarks.includes('Group:')) {
-                                feat.properties.remarks = feat.properties.remarks.replace(
-                                    /Group: .*$/m, 
-                                    'Group: ' + include.group.replace(/_/g,"-").trim()
+            // Process aircraft that match by ICAO hex first
+            for (const [hexCode, include] of hexMap.entries()) {
+                // Find aircraft with matching hex code
+                for (const [id, feat] of ids.entries()) {
+                    if (processedIds.has(id)) continue; // Skip already processed
+                    
+                    const ac = feat.properties.metadata;
+                    if (ac.hex && ac.hex.toLowerCase().trim() === hexCode) {
+                        // Apply customizations
+                        if (include.group !== undefined) {
+                            feat.properties.metadata.group = include.group;
+                            
+                            // Update remarks with the new group
+                            if (include.group.trim() !== 'None' && include.group.trim() !== 'UNKNOWN') {
+                                feat.properties.remarks = updateRemarks(
+                                    feat.properties.remarks, 
+                                    { 'Group': include.group.replace(/_/g, '-').trim() }
                                 );
                             } else {
-                                // Otherwise add the Group line before Comments if it exists
-                                if (feat.properties.remarks.includes('Comments:')) {
-                                    feat.properties.remarks = feat.properties.remarks.replace(
-                                        /(Comments:.*)$/m,
-                                        'Group: ' + include.group.replace(/_/g,"-").trim() + '\n$1'
-                                    );
-                                } else {
-                                    // Add at the end if no Comments line
-                                    feat.properties.remarks += '\nGroup: ' + include.group.replace(/_/g,"-").trim();
-                                }
+                                // Remove Group field if None/UNKNOWN
+                                feat.properties.remarks = updateRemarks(
+                                    feat.properties.remarks, 
+                                    { 'Group': null }
+                                );
                             }
-                        } else {
-                            // If group is None/UNKNOWN, remove any existing Group line
-                            feat.properties.remarks = feat.properties.remarks.replace(/\nGroup: .*$/m, '');
                         }
-                    }
 
-                    if (include && include.comments !== undefined) {
-                        feat.properties.metadata.comments = include.comments;
-                        
-                        // Update remarks to include the new comments
-                        if (include.comments) {
-                            // If remarks already has a Comments line, replace it
-                            if (feat.properties.remarks.includes('Comments:')) {
-                                feat.properties.remarks = feat.properties.remarks.replace(
-                                    /Comments: .*$/m, 
-                                    'Comments: ' + include.comments.trim()
+                        if (include.comments !== undefined) {
+                            feat.properties.metadata.comments = include.comments;
+                            
+                            // Update remarks with the new comments
+                            if (include.comments) {
+                                feat.properties.remarks = updateRemarks(
+                                    feat.properties.remarks, 
+                                    { 'Comments': include.comments.trim() }
                                 );
                             } else {
-                                // Otherwise add the Comments line
-                                feat.properties.remarks += '\nComments: ' + include.comments.trim();
+                                // Remove Comments field if empty
+                                feat.properties.remarks = updateRemarks(
+                                    feat.properties.remarks, 
+                                    { 'Comments': null }
+                                );
                             }
-                        } else {
-                            // If comments is empty/null, remove any existing Comments line
-                            feat.properties.remarks = feat.properties.remarks.replace(/\nComments: .*$/m, '');
                         }
-                    }
-
-                    if (!features_ids.has(id)) {
-                        features_ids.add(id);
+                        
+                        processedIds.add(id);
                         features.push(feat);
                     }
                 }
             }
-        } else {
-            // When filtering is disabled, include all aircraft
-            for (const feat of ids.values()) {
+            
+            // Process aircraft that match by registration
+            for (const [id, include] of includesMap.entries()) {
+                if (ids.has(id) && !processedIds.has(id)) {
+                    const feat = ids.get(id);
 
-                if (!features_ids.has(feat.id)) {
-                    features_ids.add(feat.id);
+                    if (include && include.ICAO_hex) {
+                        // No need to update callsign here as we're now matching on hex code
+                    }
+
+                    // Update metadata and remarks for group
+                    if (include && include.group) {
+                        feat.properties.metadata.group = include.group;
+                        
+                        // Update remarks with the new group
+                        if (include.group.trim() !== 'None' && include.group.trim() !== 'UNKNOWN') {
+                            feat.properties.remarks = updateRemarks(
+                                feat.properties.remarks, 
+                                { 'Group': include.group.replace(/_/g, '-').trim() }
+                            );
+                        } else {
+                            // Remove Group field if None/UNKNOWN
+                            feat.properties.remarks = updateRemarks(
+                                feat.properties.remarks, 
+                                { 'Group': null }
+                            );
+                        }
+                    }
+
+                    // Update metadata and remarks for comments
+                    if (include && include.comments !== undefined) {
+                        feat.properties.metadata.comments = include.comments;
+                        
+                        // Update remarks with the new comments
+                        if (include.comments) {
+                            feat.properties.remarks = updateRemarks(
+                                feat.properties.remarks, 
+                                { 'Comments': include.comments.trim() }
+                            );
+                        } else {
+                            // Remove Comments field if empty
+                            feat.properties.remarks = updateRemarks(
+                                feat.properties.remarks, 
+                                { 'Comments': null }
+                            );
+                        }
+                    }
+
+                    // Add to features array and mark as processed
+                    processedIds.add(id);
                     features.push(feat);
                 }
+            }
+        } else {
+            // When filtering is disabled, include all aircraft
+            // Simply add all values from the ids Map to the features array
+            for (const feat of ids.values()) {
+                features.push(feat);
             }
         }
 
