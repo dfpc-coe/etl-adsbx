@@ -488,7 +488,7 @@ export default class Task extends ETL {
             if (rawResponse && typeof rawResponse === 'object' && 'ac' in rawResponse && Array.isArray(rawResponse.ac)) {
                 // Use type assertion to help TypeScript understand the structure
                 body = rawResponse as { ac: AircraftData[], msg: string };
-                console.log(`Processing ${body.ac.length} aircraft`);
+                console.log(`ok - Received ${body.ac.length} aircraft from API`);
             } else {
                 throw new Error('Invalid API response format: missing aircraft data');
             }
@@ -531,14 +531,20 @@ export default class Task extends ETL {
             const coordinates = [ac.lon, ac.lat];
 
             // Handle altitude conversion from feet to meters with proper type checking
+            // Try alt_geom first, then fall back to alt_baro if alt_geom is not available
+            let altitudeValue;
+            
             if (ac.alt_geom !== undefined && ac.alt_geom !== null) {
                 // Convert to number if it's a string, or use the number directly
-                const altitudeValue = typeof ac.alt_geom === 'string' ? parseFloat(ac.alt_geom) : ac.alt_geom;
-                
-                // Only add valid numeric altitudes (including negative values for below sea level)
-                if (!isNaN(altitudeValue)) {
-                    coordinates.push(altitudeValue * FEET_TO_METERS);
-                }
+                altitudeValue = typeof ac.alt_geom === 'string' ? parseFloat(ac.alt_geom) : ac.alt_geom;
+            } else if (ac.alt_baro !== undefined && ac.alt_baro !== null) {
+                // Fall back to barometric altitude if geometric altitude is not available
+                altitudeValue = typeof ac.alt_baro === 'string' ? parseFloat(ac.alt_baro) : ac.alt_baro;
+            }
+            
+            // Add the altitude to coordinates if we have a valid value, otherwise use NaN
+            if (altitudeValue !== undefined && !isNaN(altitudeValue)) {
+                coordinates.push(altitudeValue * FEET_TO_METERS);
             } else {
                 // Add NaN for unknown altitude per CoT specification
                 coordinates.push(Number.NaN);
@@ -918,7 +924,8 @@ export default class Task extends ETL {
             }
         }
 
-        console.log(`ok - fetched ${ids.size} aircraft`);
+        // Log the number of aircraft that passed our filtering criteria
+        console.log(`ok - processed ${ids.size} valid aircraft (filtered from ${body.ac.length} total)`);
         
         // Create the final GeoJSON feature collection to submit
         const fc: Static<typeof InputFeatureCollection> = {
@@ -926,6 +933,7 @@ export default class Task extends ETL {
             features
         };
 
+        console.log(`ok - submitting ${features.length} features to CloudTAK`);
         await this.submit(fc);
     }
 }
