@@ -531,14 +531,20 @@ export default class Task extends ETL {
             const coordinates = [ac.lon, ac.lat];
 
             // Handle altitude conversion from feet to meters with proper type checking
+            // Try alt_geom first, then fall back to alt_baro if alt_geom is not available
+            let altitudeValue;
+            
             if (ac.alt_geom !== undefined && ac.alt_geom !== null) {
                 // Convert to number if it's a string, or use the number directly
-                const altitudeValue = typeof ac.alt_geom === 'string' ? parseFloat(ac.alt_geom) : ac.alt_geom;
-                
-                // Only add valid numeric altitudes (including negative values for below sea level)
-                if (!isNaN(altitudeValue)) {
-                    coordinates.push(altitudeValue * FEET_TO_METERS);
-                }
+                altitudeValue = typeof ac.alt_geom === 'string' ? parseFloat(ac.alt_geom) : ac.alt_geom;
+            } else if (ac.alt_baro !== undefined && ac.alt_baro !== null) {
+                // Fall back to barometric altitude if geometric altitude is not available
+                altitudeValue = typeof ac.alt_baro === 'string' ? parseFloat(ac.alt_baro) : ac.alt_baro;
+            }
+            
+            // Add the altitude to coordinates if we have a valid value, otherwise use NaN
+            if (altitudeValue !== undefined && !isNaN(altitudeValue)) {
+                coordinates.push(altitudeValue * FEET_TO_METERS);
             } else {
                 // Add NaN for unknown altitude per CoT specification
                 coordinates.push(Number.NaN);
