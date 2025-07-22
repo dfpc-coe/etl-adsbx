@@ -642,8 +642,8 @@ export default class Task extends ETL {
                 if (include.group !== undefined) {
                     ac.group = include.group;
                 }
-                if (include.cot_type !== undefined) {
-                    ac.cot_type = include.cot_type;
+                if (include.type !== undefined) {
+                    ac.cot_type = include.type;
                 }
                 if (include.comments !== undefined) {
                     ac.comments = include.comments;
