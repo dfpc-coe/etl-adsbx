@@ -488,7 +488,7 @@ export default class Task extends ETL {
             if (rawResponse && typeof rawResponse === 'object' && 'ac' in rawResponse && Array.isArray(rawResponse.ac)) {
                 // Use type assertion to help TypeScript understand the structure
                 body = rawResponse as { ac: AircraftData[], msg: string };
-                console.log(`Processing ${body.ac.length} aircraft`);
+                console.log(`ok - Received ${body.ac.length} aircraft from API`);
             } else {
                 throw new Error('Invalid API response format: missing aircraft data');
             }
@@ -918,7 +918,8 @@ export default class Task extends ETL {
             }
         }
 
-        console.log(`ok - fetched ${ids.size} aircraft`);
+        // Log the number of aircraft that passed our filtering criteria
+        console.log(`ok - processed ${ids.size} valid aircraft (filtered from ${body.ac.length} total)`);
         
         // Create the final GeoJSON feature collection to submit
         const fc: Static<typeof InputFeatureCollection> = {
@@ -926,6 +927,7 @@ export default class Task extends ETL {
             features
         };
 
+        console.log(`ok - submitting ${features.length} features to CloudTAK`);
         await this.submit(fc);
     }
 }
