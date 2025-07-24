@@ -61,6 +61,11 @@ const VALID_ICON_GROUPS = new Set([
     'EMS_FIXED_WING',
     'EMS_ROTOR',
     'EMS_ROTOR_RESCUE',
+    'FED_FIXED_WING',
+    'FED_FIXED_WING_ISR',
+    'FED_ROTOR',
+    'FED_ROTOR_RESCUE',
+    'FED_UAS',
     'FIRE_AIR_ATTACK',
     'FIRE_AIR_TANKER',
     'FIRE_INTEL',
@@ -78,13 +83,8 @@ const VALID_ICON_GROUPS = new Set([
     'LE_ROTOR',
     'LE_ROTOR_RESCUE',
     'LE_UAS',
-    'FED_FIXED_WING',
-    'FED_FIXED_WING_ISR',
-    'FED_ROTOR',
-    'FED_ROTOR_RESCUE',
-    'FED_UAS',
-    'MIL_ROTOR_MED_RESCUE',
-    'MIL_ROTOR_ISR_RESCUE'
+    'MIL_ROTOR_ISR_RESCUE',
+    'MIL_ROTOR_MED_RESCUE'
 ]);
 
 /**
@@ -155,6 +155,11 @@ const Env = Type.Object({
                 'EMS_FIXED_WING',
                 'EMS_ROTOR',
                 'EMS_ROTOR_RESCUE',
+                'FED_FIXED_WING',
+                'FED_FIXED_WING_ISR',
+                'FED_ROTOR',
+                'FED_ROTOR_RESCUE',
+                'FED_UAS',
                 'FIRE_AIR_ATTACK',
                 'FIRE_AIR_TANKER',
                 'FIRE_INTEL',
@@ -172,13 +177,8 @@ const Env = Type.Object({
                 'LE_ROTOR',
                 'LE_ROTOR_RESCUE',
                 'LE_UAS',
-                'FED_FIXED_WING',
-                'FED_FIXED_WING_ISR',
-                'FED_ROTOR',
-                'FED_ROTOR_RESCUE',
-                'FED_UAS',
-                'MIL_ROTOR_MED_RESCUE',
-                'MIL_ROTOR_ISR_RESCUE'
+                'MIL_ROTOR_ISR_RESCUE',
+                'MIL_ROTOR_MED_RESCUE'
             ]
         }),
         type: Type.Optional(Type.String({ description: 'Custom CoT type. E.g. a-f-A-M-F-C-H' })),
@@ -518,16 +518,16 @@ export default class Task extends ETL {
             }
         }
 
-        // Map to store processed aircraft data by ID (registration or flight number)
+        // Map to store processed aircraft data by ID (ICAO hex code)
         const ids = new Map();
 
         // Process each aircraft from the API response
         for (const ac of body.ac) {
-            if (!ac.flight && !ac.r) continue;
+            if (!ac.hex) continue;
 
             if (env.ADSBX_Ignore_Tower_Vehicles && (ac.r == 'TWR' || ac.r == 'GND' || ac.type == 'adsb_icao_nt' )) continue; // Ignore tower, ground vehicles and test equipment
 
-            const id = (ac.r || ac.flight).toLowerCase().trim();
+            const id = ac.hex.toLowerCase().trim();
             const coordinates = [ac.lon, ac.lat];
 
             // Handle altitude conversion from feet to meters with proper type checking
