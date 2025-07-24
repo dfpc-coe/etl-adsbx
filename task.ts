@@ -865,55 +865,55 @@ export default class Task extends ETL {
             }
             
             // Process aircraft that match by registration
-            for (const [id, include] of includesMap.entries()) {
-                if (ids.has(id) && !processedIds.has(id)) {
-                    const feat = ids.get(id);
-
-                    if (include && include.ICAO_hex) {
-                        // No need to update callsign here as we're now matching on hex code
-                    }
-
-                    // Update metadata and remarks for group
-                    if (include && include.group) {
-                        feat.properties.metadata.group = include.group;
-                        
-                        // Update remarks with the new group
-                        if (include.group.trim() !== 'None' && include.group.trim() !== 'UNKNOWN') {
-                            feat.properties.remarks = updateRemarks(
-                                feat.properties.remarks, 
-                                { 'Group': include.group.replace(/_/g, '-').trim() }
-                            );
-                        } else {
-                            // Remove Group field if None/UNKNOWN
-                            feat.properties.remarks = updateRemarks(
-                                feat.properties.remarks, 
-                                { 'Group': null }
-                            );
+            for (const [registration, include] of includesMap.entries()) {
+                // Find aircraft with matching registration
+                for (const [id, feat] of ids.entries()) {
+                    if (processedIds.has(id)) continue; // Skip already processed
+                    
+                    const ac = feat.properties.metadata;
+                    if (ac.r && ac.r.toLowerCase().trim() === registration) {
+                        // Update metadata and remarks for group
+                        if (include.group) {
+                            feat.properties.metadata.group = include.group;
+                            
+                            // Update remarks with the new group
+                            if (include.group.trim() !== 'None' && include.group.trim() !== 'UNKNOWN') {
+                                feat.properties.remarks = updateRemarks(
+                                    feat.properties.remarks, 
+                                    { 'Group': include.group.replace(/_/g, '-').trim() }
+                                );
+                            } else {
+                                // Remove Group field if None/UNKNOWN
+                                feat.properties.remarks = updateRemarks(
+                                    feat.properties.remarks, 
+                                    { 'Group': null }
+                                );
+                            }
                         }
-                    }
 
-                    // Update metadata and remarks for comments
-                    if (include && include.comments !== undefined) {
-                        feat.properties.metadata.comments = include.comments;
-                        
-                        // Update remarks with the new comments
-                        if (include.comments) {
-                            feat.properties.remarks = updateRemarks(
-                                feat.properties.remarks, 
-                                { 'Comments': include.comments.trim() }
-                            );
-                        } else {
-                            // Remove Comments field if empty
-                            feat.properties.remarks = updateRemarks(
-                                feat.properties.remarks, 
-                                { 'Comments': null }
-                            );
+                        // Update metadata and remarks for comments
+                        if (include.comments !== undefined) {
+                            feat.properties.metadata.comments = include.comments;
+                            
+                            // Update remarks with the new comments
+                            if (include.comments) {
+                                feat.properties.remarks = updateRemarks(
+                                    feat.properties.remarks, 
+                                    { 'Comments': include.comments.trim() }
+                                );
+                            } else {
+                                // Remove Comments field if empty
+                                feat.properties.remarks = updateRemarks(
+                                    feat.properties.remarks, 
+                                    { 'Comments': null }
+                                );
+                            }
                         }
-                    }
 
-                    // Add to features array and mark as processed
-                    processedIds.add(id);
-                    features.push(feat);
+                        // Add to features array and mark as processed
+                        processedIds.add(id);
+                        features.push(feat);
+                    }
                 }
             }
         } else {
