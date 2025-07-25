@@ -1,19 +1,19 @@
 domain,icao_hex,registration,group,type,comments
-MIL,,NZ1401,,a-f-A-M-F-Y,Beechcraft T-6C Texan II trainer
-MIL,,NZ1402,,a-f-A-M-F-Y,Beechcraft T-6C Texan II trainer
-MIL,,NZ1403,,a-f-A-M-F-Y,Beechcraft T-6C Texan II trainer
-MIL,,NZ1404,,a-f-A-M-F-Y,Beechcraft T-6C Texan II trainer
-MIL,,NZ1405,,a-f-A-M-F-Y,Beechcraft T-6C Texan II trainer
-MIL,,NZ1406,,a-f-A-M-F-Y,Beechcraft T-6C Texan II trainer
-MIL,,NZ1407,,a-f-A-M-F-Y,Beechcraft T-6C Texan II trainer
-MIL,,NZ1408,,a-f-A-M-F-Y,Beechcraft T-6C Texan II trainer
-MIL,,NZ1409,,a-f-A-M-F-Y,Beechcraft T-6C Texan II trainer
-MIL,,NZ1410,,a-f-A-M-F-Y,Beechcraft T-6C Texan II trainer
-MIL,,NZ1411,,a-f-A-M-F-Y,Beechcraft T-6C Texan II trainer
-MIL,,NZ2350,,a-f-A-M-F-U,Beech King Air 350i (KA350) 
-MIL,,NZ2351,,a-f-A-M-F-U,Beech King Air 350i (KA350)
-MIL,,NZ2352,,a-f-A-M-F-U,Beech King Air 350i (KA350)
-MIL,,NZ2353,,a-f-A-M-F-U,Beech King Air 350i (KA350)
+MIL,,NZ1401,,a-f-A-M-F-T,Beechcraft T-6C Texan II trainer
+MIL,,NZ1402,,a-f-A-M-F-T,Beechcraft T-6C Texan II trainer
+MIL,,NZ1403,,a-f-A-M-F-T,Beechcraft T-6C Texan II trainer
+MIL,,NZ1404,,a-f-A-M-F-T,Beechcraft T-6C Texan II trainer
+MIL,,NZ1405,,a-f-A-M-F-T,Beechcraft T-6C Texan II trainer
+MIL,,NZ1406,,a-f-A-M-F-T,Beechcraft T-6C Texan II trainer
+MIL,,NZ1407,,a-f-A-M-F-T,Beechcraft T-6C Texan II trainer
+MIL,,NZ1408,,a-f-A-M-F-T,Beechcraft T-6C Texan II trainer
+MIL,,NZ1409,,a-f-A-M-F-T,Beechcraft T-6C Texan II trainer
+MIL,,NZ1410,,a-f-A-M-F-T,Beechcraft T-6C Texan II trainer
+MIL,,NZ1411,,a-f-A-M-F-T,Beechcraft T-6C Texan II trainer
+MIL,,NZ2350,,a-f-A-M-F-R,Beech King Air 350i (KA350) 
+MIL,,NZ2351,,a-f-A-M-F-R,Beech King Air 350i (KA350)
+MIL,,NZ2352,,a-f-A-M-F-R,Beech King Air 350i (KA350)
+MIL,,NZ2353,,a-f-A-M-F-R,Beech King Air 350i (KA350)
 MIL,,NZ3301,,a-f-A-M-H,NHI NH90-TTH
 MIL,,NZ3302,,a-f-A-M-H,NHI NH90-TTH
 MIL,,NZ3303,,a-f-A-M-H,NHI NH90-TTH
@@ -39,10 +39,10 @@ MIL,,NZ3617,,a-f-A-M-H-S,Kaman SH-2 Super Seasprite
 MIL,,NZ3618,,a-f-A-M-H-S,Kaman SH-2 Super Seasprite
 MIL,,NZ3619,,a-f-A-M-H-S,Kaman SH-2 Super Seasprite
 MIL,,NZ3620,,a-f-A-M-H-S,Kaman SH-2 Super Seasprite
-MIL,,NZ4801,,a-f-A-M-F-R,Boeing P-8A Poseidon
-MIL,,NZ4802,,a-f-A-M-F-R,Boeing P-8A Poseidon
-MIL,,NZ4803,,a-f-A-M-F-R,Boeing P-8A Poseidon
-MIL,,NZ4804,,a-f-A-M-F-R,Boeing P-8A Poseidon
+MIL,,NZ4801,,a-f-A-M-F-P,Boeing P-8A Poseidon
+MIL,,NZ4802,,a-f-A-M-F-P,Boeing P-8A Poseidon
+MIL,,NZ4803,,a-f-A-M-F-P,Boeing P-8A Poseidon
+MIL,,NZ4804,,a-f-A-M-F-P,Boeing P-8A Poseidon
 MIL,,NZ7001,,a-f-A-M-F-C-M,Lockheed C-130H Hercules 
 MIL,,NZ7002,,a-f-A-M-F-C-M,Lockheed C-130H Hercules 
 MIL,,NZ7003,,a-f-A-M-F-C-M,Lockheed C-130H Hercules 
@@ -97,7 +97,7 @@ EMS,,ZK-IWG,EMS_ROTOR_RESCUE,,Otago Rescue Helicopter - Air 5 Dunedin
 EMS,,ZK-IWL,EMS_ROTOR_RESCUE,,Otago Rescue Helicopter - Air 2 Queenstown
 EMS,,ZK-IXD,EMS_ROTOR_RESCUE,,Taupo
 EMS,,ZK-IXN,EMS_ROTOR_RESCUE,,Hamilton - Air 1 Waikato
-EMS,,ZK-IXO,EMS_ROTOR_RESCUE,,Taurange
+EMS,,ZK-IXO,EMS_ROTOR_RESCUE,,Tauranga
 EMS,,ZK-IZB,EMS_ROTOR_RESCUE,,Auckland Rescue Helicopter
 EMS,,ZK-LFA,EMS_FIXED_WING,,Life Flight
 EMS,,ZK-LFI,EMS_FIXED_WING,,Life Flight
