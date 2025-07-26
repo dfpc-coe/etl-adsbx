@@ -198,7 +198,7 @@ const Env = Type.Object({
     }),
     'ADSBX_ICAOHex_Domestic_End': Type.String({ 
         description: 'ICAO HEX start value for domestic flights. E.g. AFFFFF for USA or C87FFF for NZ.', 
-        default: 'AFFFFF'
+        default: 'C87FFF'
     }),
     'DEBUG': Type.Boolean({ 
         description: 'Print ADSBX results in logs.', 
