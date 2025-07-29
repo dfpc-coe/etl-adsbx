@@ -1,4 +1,4 @@
-# ETL-ADSBX</h1>
+# ETL-ADSBX
 
 <p align='center'>Aircraft location data via ADS-B</p>
 
@@ -8,7 +8,7 @@
 
 ## Example Data
 
-![EAircraft location data via ADS-B](docs/etl-adsbx.png)
+![Aircraft location data via ADS-B](docs/etl-adsbx.png)
 
 ## Supported icons for public safety aircraft
 * a-f-A-M-F-A = Friendly Military Fixed Wing - Attack Aircraft
