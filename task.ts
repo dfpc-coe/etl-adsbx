@@ -136,9 +136,10 @@ export default class Task extends ETL {
         const ids = new Map();
 
         for (const ac of body.ac) {
-            if (!ac.flight && !ac.r) continue;
+            const rawId = ac.r || ac.flight;
+            if (!rawId) continue;
 
-            const id = (ac.r || ac.flight).toLowerCase().trim();
+            const id = rawId.toLowerCase().trim();
             const coordinates = [ac.lon, ac.lat];
 
             // If alt. is present convert to meters
@@ -191,7 +192,7 @@ export default class Task extends ETL {
                     callsign: (ac.flight || '').trim(),
                     time: new Date(),
                     start: new Date(),
-                    speed: ac.gs * 0.514444 || 9999999.0,
+                    speed: (ac.gs ?? 9999999.0) * 0.514444,
                     course: ac.track || 9999999.0,
                     metadata: ac,
                     remarks: [
@@ -215,10 +216,13 @@ export default class Task extends ETL {
 
         if (env.ADSBX_INCLUDES_FILTERING) {
             for (const include of env.ADSBX_INCLUDES) {
+                if (!include.registration) continue;
+
                 const id = include.registration.toLowerCase().trim();
 
                 if (ids.has(id)) {
                     const feat = ids.get(id);
+                    if (!feat) continue;
 
                     if (include.callsign) {
                         feat.properties.callsign = include.callsign;
