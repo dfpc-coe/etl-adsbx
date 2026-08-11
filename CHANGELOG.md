@@ -10,6 +10,10 @@
 
 ## Version History
 
+### v5.14.1
+
+- :bug: Ensure included property is always present
+
 ### v5.14.0
 
 - :tada: Allow Including by Elevation

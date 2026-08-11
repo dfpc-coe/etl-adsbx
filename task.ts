@@ -253,8 +253,6 @@ export default class Task extends ETL {
             }
         } else {
             for (const feat of ids.values()) {
-                feat.properties.metadata.included = false;
-
                 if (!features_ids.has(feat.id)) {
                     features_ids.add(feat.id);
                     features.push(feat);
@@ -265,8 +263,6 @@ export default class Task extends ETL {
         if (env.ADSBX_INCLUDE_BELOW_ELEVATION) {
             for (const feat of ids.values()) {
                 if (features_ids.has(feat.id)) continue;
-
-                feat.properties.metadata.included = false;
 
                 const ac = feat.properties.metadata;
 
@@ -279,6 +275,12 @@ export default class Task extends ETL {
                 }
             }
         }
+
+        features.map(f => {
+            if (f.properties.metadata.included === undefined) {
+                f.properties.metadata.included = false;
+            }
+        });
 
         console.log(`ok - fetched ${ids.size} aircraft`);
         const fc: Static<typeof Feature.InputFeatureCollection> = {
