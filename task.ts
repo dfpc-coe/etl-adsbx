@@ -78,9 +78,6 @@ const ADSBResponse = Type.Object({
         default: 'UNKNOWN',
         description: 'Provided by the join with ADSBX_INCLUDES items'
     })),
-    included: Type.Boolean({
-        description: 'True if the aircraft was included in the ADSBX_INCLUDES list, false otherwise',
-    }),
     flight: Type.Optional(Type.String()),
     r: Type.Optional(Type.String()),
     t: Type.Optional(Type.String()),
@@ -116,7 +113,14 @@ export default class Task extends ETL {
             if (type === SchemaType.Input) {
                 return Env;
             } else {
-                return ADSBResponse;
+                return Type.Composite([
+                    ADSBResponse,
+                    Type.Object({
+                        included: Type.Boolean({
+                            description: 'True if the aircraft was included in the ADSBX_INCLUDES list, false otherwise',
+                        }),
+                    })
+                ])
             }
         } else {
             return Type.Object({});

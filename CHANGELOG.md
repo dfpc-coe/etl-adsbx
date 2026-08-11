@@ -10,6 +10,10 @@
 
 ## Version History
 
+### v5.14.2
+
+- :bug: Switch to composite function
+
 ### v5.14.1
 
 - :bug: Ensure included property is always present
