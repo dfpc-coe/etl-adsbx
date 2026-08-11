@@ -10,6 +10,10 @@
 
 ## Version History
 
+### v5.14.0
+
+- :tada: Allow Including by Elevation
+
 ### v5.13.0
 
 - :arrow_up: Update GH Actions

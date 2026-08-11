@@ -59,6 +59,14 @@ const Env = Type.Object({
             ]
         }),
     })),
+    'ADSBX_INCLUDE_BELOW_ELEVATION': Type.Boolean({
+        description: 'Additively include all aircraft below the elevation specified in ADSBX_BELOW_ELEVATION_FEET, regardless of the Includes list',
+        default: false
+    }),
+    'ADSBX_BELOW_ELEVATION_FEET': Type.Number({
+        description: 'Elevation in feet below which aircraft are additively included when ADSBX_INCLUDE_BELOW_ELEVATION is enabled',
+        default: 18000
+    }),
     'ADSBX_EMERGENCY_HOSTILE': Type.Boolean({ description: 'Mark flights in status "emergency" as "hostile". This allows them to appear in red on a TAK map.', default: false }),
     'DEBUG': Type.Boolean({ description: 'Print ADSBX results in logs', default: false })
 });
@@ -70,6 +78,9 @@ const ADSBResponse = Type.Object({
         default: 'UNKNOWN',
         description: 'Provided by the join with ADSBX_INCLUDES items'
     })),
+    included: Type.Boolean({
+        description: 'True if the aircraft was included in the ADSBX_INCLUDES list, false otherwise',
+    }),
     flight: Type.Optional(Type.String()),
     r: Type.Optional(Type.String()),
     t: Type.Optional(Type.String()),
@@ -232,6 +243,8 @@ export default class Task extends ETL {
                         feat.properties.metadata.group = include.group;
                     }
 
+                    feat.properties.metadata.included = true;
+
                     if (!features_ids.has(id)) {
                         features_ids.add(id);
                         features.push(feat);
@@ -240,8 +253,27 @@ export default class Task extends ETL {
             }
         } else {
             for (const feat of ids.values()) {
+                feat.properties.metadata.included = false;
 
                 if (!features_ids.has(feat.id)) {
+                    features_ids.add(feat.id);
+                    features.push(feat);
+                }
+            }
+        }
+
+        if (env.ADSBX_INCLUDE_BELOW_ELEVATION) {
+            for (const feat of ids.values()) {
+                if (features_ids.has(feat.id)) continue;
+
+                feat.properties.metadata.included = false;
+
+                const ac = feat.properties.metadata;
+
+                // ADS-B altitudes are reported in feet; alt_baro is the string "ground" when landed
+                const alt = ac.alt_geom ?? ac.alt_baro;
+
+                if (alt === 'ground' || (typeof alt === 'number' && alt < env.ADSBX_BELOW_ELEVATION_FEET)) {
                     features_ids.add(feat.id);
                     features.push(feat);
                 }
