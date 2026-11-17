@@ -100,6 +100,36 @@ const ADSBResponse = Type.Object({
     dst: Type.Optional(Type.Number()),
 })
 
+// Type of aircraft (fixed wing -F, rotorcraft -H, airship/balloon -L) by emitter category - unknown when unlisted
+// https://www.adsbexchange.com/emitter-category-ads-b-do-260b-2-2-3-2-5-2/
+const EMITTER_TYPES = new Map<string, string>([
+    // No ADS-B emitter category information. Still used for some airplanes.
+    ['A0', '-F'],
+    // Light (< 15500 lbs) fixed wing aircraft
+    ['A1', '-F'],
+    // Small (15500-75000 lbs) fixed wing aircraft
+    ['A2', '-F'],
+    // Large (75000 to 300000 lbs) fixed wing aircraft
+    ['A3', '-F'],
+    // High vortex large (aircraft such as B-757) fixed wing aircraft
+    ['A4', '-F'],
+    // Heavy (> 300000 lbs) fixed wing aircraft
+    ['A5', '-F'],
+    // High performance (> 5g acceleration and 400 kts) fixed wing aircraft
+    ['A6', '-F'],
+    // Rotorcraft – Any rotorcraft regardless of weight.
+    ['A7', '-H'],
+    // Lighter-than-air – Any lighter than air (airship or balloon) regardless of weight.
+    ['B2', '-L']
+]);
+
+type Aircraft = Static<typeof ADSBResponse> & { included?: boolean };
+
+type AircraftFeature = Static<typeof Feature.InputFeature> & {
+    id: string;
+    properties: { metadata: Aircraft };
+};
+
 export default class Task extends ETL {
     static name = 'etl-adsbx'
     static flow = [ DataFlowType.Incoming ];
@@ -110,21 +140,19 @@ export default class Task extends ETL {
         flow: DataFlowType = DataFlowType.Incoming
     ): Promise<TSchema> {
         if (flow === DataFlowType.Incoming) {
-            if (type === SchemaType.Input) {
-                return Env;
-            } else {
-                return Type.Composite([
-                    ADSBResponse,
-                    Type.Object({
-                        included: Type.Boolean({
-                            description: 'True if the aircraft was included in the ADSBX_INCLUDES list, false otherwise',
-                        }),
-                    })
-                ])
-            }
-        } else {
-            return Type.Object({});
+            if (type === SchemaType.Input) return Env;
+
+            return Type.Composite([
+                ADSBResponse,
+                Type.Object({
+                    included: Type.Boolean({
+                        description: 'True if the aircraft was included in the ADSBX_INCLUDES list, false otherwise',
+                    }),
+                })
+            ])
         }
+
+        return Type.Object({});
     }
 
     async control() {
@@ -134,7 +162,7 @@ export default class Task extends ETL {
 
         const url = new URL(api);
         url.searchParams.append('apiKey', env.ADSBX_TOKEN);
-        url.searchParams.append('cacheBuster', String(new Date().getTime()));
+        url.searchParams.append('cacheBuster', String(Date.now()));
 
         const res = await fetch(url, {
             headers: {
@@ -148,7 +176,7 @@ export default class Task extends ETL {
             ac: Type.Array(ADSBResponse)
         }));
 
-        const ids = new Map();
+        const ids = new Map<string, AircraftFeature>();
 
         for (const ac of body.ac) {
             const rawId = ac.r || ac.flight;
@@ -158,45 +186,24 @@ export default class Task extends ETL {
             const coordinates = [ac.lon, ac.lat];
 
             // If alt. is present convert to meters
-            if (ac.alt_geom) coordinates.push(ac.alt_geom * 0.3048);
+            if (ac.alt_geom !== undefined && ac.alt_geom !== 0) coordinates.push(ac.alt_geom * 0.3048);
 
-            if (!id.trim().length) continue;
+            if (id.trim().length === 0) continue;
 
-            // Determin the type of aircraft (fixed wing, rotorcraft, airship/balloon, etc.)
-            // https://www.adsbexchange.com/emitter-category-ads-b-do-260b-2-2-3-2-5-2/
-            let ac_type = ''; // Unknown
-            switch (ac.category) {
-                case 'A0':  // No ADS-B emitter category information. Still used for some airplanes.
-                case 'A1':  // Light (< 15500 lbs) fixed wing aircraft
-                case 'A2':  // Small (15500-75000 lbs) fixed wing aircraft
-                case 'A3':  // Large (75000 to 300000 lbs) fixed wing aircraft
-                case 'A4':  // High vortex large (aircraft such as B-757) fixed wing aircraft
-                case 'A5':  // Heavy (> 300000 lbs) fixed wing aircraft
-                case 'A6':  // High performance (> 5g acceleration and 400 kts) fixed wing aircraft
-                    ac_type = '-F'; // Fixed Wing
-                    break;
-                case 'A7':
-                    ac_type = '-H'; // Rotorcraft – Any rotorcraft regardless of weight.
-                    break;
-                case 'B2':
-                    ac_type = '-L'; // Lighter-than-air – Any lighter than air (airship or balloon) regardless of weight.
-                    break;
-                default:
-                    break;
-            }
+            const ac_type = EMITTER_TYPES.get(ac.category ?? '') ?? '';
 
-            // Determine whether the aircraft is civilian or military
+            // Determine whether the aircraft is civilian (-C) or military (-M)
             // https://www.adsbexchange.com/version-2-api-wip/
-            let ac_civmil = '-C'; // Civilian
+            let ac_civmil = '-C';
             if (ac.dbFlags !== undefined && ac.dbFlags % 2 !== 0) {
-                ac_civmil = '-M'; // Military
+                ac_civmil = '-M';
             }
 
-            // Determine whether the aircraft is in emergency mode (show in red aka. "hostile") or not
+            // Determine whether the aircraft is in emergency mode (-h, show in red aka. "hostile") or not (-f)
             // https://www.adsbexchange.com/version-2-api-wip/
-            let ac_emergency = '-f'; // Normal
+            let ac_emergency = '-f';
             if (ac.emergency !== undefined && ac.emergency !== 'none' && env.ADSBX_EMERGENCY_HOSTILE) {
-                ac_emergency = '-h'; // Emergency
+                ac_emergency = '-h';
             }
 
             ids.set(id, {
@@ -205,10 +212,10 @@ export default class Task extends ETL {
                 properties: {
                     type: 'a' + ac_emergency + '-A' + ac_civmil + ac_type,
                     callsign: (ac.flight || '').trim(),
-                    time: new Date(),
-                    start: new Date(),
+                    time: new Date().toISOString(),
+                    start: new Date().toISOString(),
                     speed: (ac.gs ?? 9999999.0) * 0.514444,
-                    course: ac.track || 9999999.0,
+                    course: ac.track !== undefined && ac.track !== 0 ? ac.track : 9999999.0,
                     metadata: ac,
                     remarks: [
                         'Flight: ' + (ac.flight || 'Unknown').trim(),
@@ -226,8 +233,8 @@ export default class Task extends ETL {
             });
         }
 
-        const features = [];
-        const features_ids = new Set();
+        const features: AircraftFeature[] = [];
+        const features_ids = new Set<string>();
 
         if (env.ADSBX_INCLUDES_FILTERING) {
             for (const include of env.ADSBX_INCLUDES) {
@@ -280,11 +287,9 @@ export default class Task extends ETL {
             }
         }
 
-        features.map(f => {
-            if (f.properties.metadata.included === undefined) {
-                f.properties.metadata.included = false;
-            }
-        });
+        for (const f of features) {
+            f.properties.metadata.included ??= false;
+        }
 
         console.log(`ok - fetched ${ids.size} aircraft`);
         const fc: Static<typeof Feature.InputFeatureCollection> = {
@@ -297,7 +302,7 @@ export default class Task extends ETL {
 }
 
 await local(await Task.init(import.meta.url), import.meta.url);
-export async function handler(event: Event = {}) {
-    return await internal(await Task.init(import.meta.url), event);
+export async function handler(event: Event = {}): ReturnType<typeof internal> {
+    return internal(await Task.init(import.meta.url), event);
 }
 

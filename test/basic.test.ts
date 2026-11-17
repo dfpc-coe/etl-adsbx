@@ -1,5 +1,6 @@
 import test from 'node:test';
 import assert from 'node:assert';
+import type { TSchema } from '@sinclair/typebox';
 import { SchemaType, DataFlowType } from '@tak-ps/etl';
 
 // task.ts calls Task.init() at module scope which requires an ETL environment,
@@ -10,6 +11,14 @@ process.env.ETL_TOKEN = process.env.ETL_TOKEN || 'etl.test-token';
 
 const { default: Task } = await import('../task.js');
 
+type Property = { type?: unknown; default?: unknown };
+
+function properties(schema: TSchema): Record<string, Property | undefined> {
+    const props: unknown = schema.properties;
+    assert.ok(typeof props === 'object' && props !== null);
+    return props as Record<string, Property | undefined>;
+}
+
 test('Task static config', () => {
     assert.equal(Task.name, 'etl-adsbx');
     assert.deepEqual(Task.flow, [DataFlowType.Incoming]);
@@ -18,6 +27,7 @@ test('Task static config', () => {
 test('Incoming Input schema', async () => {
     const task = await Task.init();
     const schema = await task.schema(SchemaType.Input, DataFlowType.Incoming);
+    const props = properties(schema);
 
     assert.equal(schema.type, 'object');
 
@@ -33,21 +43,22 @@ test('Incoming Input schema', async () => {
         'ADSBX_EMERGENCY_HOSTILE',
         'DEBUG'
     ]) {
-        assert.ok(schema.properties[key], `Env schema missing property: ${key}`);
+        assert.ok(props[key], `Env schema missing property: ${key}`);
     }
 
-    assert.equal(schema.properties.ADSBX_INCLUDE_BELOW_ELEVATION.type, 'boolean');
-    assert.equal(schema.properties.ADSBX_INCLUDE_BELOW_ELEVATION.default, false);
-    assert.equal(schema.properties.ADSBX_BELOW_ELEVATION_FEET.type, 'number');
-    assert.equal(schema.properties.ADSBX_BELOW_ELEVATION_FEET.default, 18000);
+    assert.equal(props.ADSBX_INCLUDE_BELOW_ELEVATION?.type, 'boolean');
+    assert.equal(props.ADSBX_INCLUDE_BELOW_ELEVATION?.default, false);
+    assert.equal(props.ADSBX_BELOW_ELEVATION_FEET?.type, 'number');
+    assert.equal(props.ADSBX_BELOW_ELEVATION_FEET?.default, 18000);
 });
 
 test('Incoming Output schema', async () => {
     const task = await Task.init();
     const schema = await task.schema(SchemaType.Output, DataFlowType.Incoming);
+    const props = properties(schema);
 
     assert.equal(schema.type, 'object');
-    assert.ok(schema.properties.hex);
-    assert.ok(schema.properties.lat);
-    assert.ok(schema.properties.lon);
+    assert.ok(props.hex);
+    assert.ok(props.lat);
+    assert.ok(props.lon);
 });
