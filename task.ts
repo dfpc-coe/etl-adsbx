@@ -186,7 +186,7 @@ export default class Task extends ETL {
             const coordinates = [ac.lon, ac.lat];
 
             // If alt. is present convert to meters
-            if (ac.alt_geom !== undefined && ac.alt_geom !== 0) coordinates.push(ac.alt_geom * 0.3048);
+            if (ac.alt_geom !== undefined) coordinates.push(ac.alt_geom * 0.3048);
 
             if (id.trim().length === 0) continue;
 
@@ -215,7 +215,7 @@ export default class Task extends ETL {
                     time: new Date().toISOString(),
                     start: new Date().toISOString(),
                     speed: (ac.gs ?? 9999999.0) * 0.514444,
-                    course: ac.track !== undefined && ac.track !== 0 ? ac.track : 9999999.0,
+                    course: ac.track ?? 9999999.0,
                     metadata: ac,
                     remarks: [
                         'Flight: ' + (ac.flight || 'Unknown').trim(),

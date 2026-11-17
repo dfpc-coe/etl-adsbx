@@ -12,6 +12,10 @@
 
 ### Pending Release
 
+### v5.18.1 - 2026-11-17
+
+- :bug: Treat `0` elevation as valid for inclusion, rather than skipping it
+
 ### v5.18.0 - 2026-11-17
 
 - :arrow_up: Migrate to TS7 for blazing build times
